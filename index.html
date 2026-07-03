@@ -214,19 +214,31 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
             </div>
             <div style="flex:1;position:relative">
               <i class="ti ti-map-pin" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--t3);font-size:15px;pointer-events:none"></i>
-              <input type="text" id="city" placeholder="Cidade ou estado — ex: Osasco, SP..." onkeydown="if(event.key==='Enter')go()" style="width:100%;padding-left:32px"/>
+              <input type="text" id="city" placeholder="Cidade — ex: Osasco" onkeydown="if(event.key==='Enter')go()" style="width:100%;padding-left:32px"/>
+            </div>
+            <div style="flex:0 0 118px;position:relative">
+              <select id="uf" title="Estado" style="width:100%;padding:9px 10px;border-radius:var(--r);border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px">
+                <option value="">Estado (UF)</option>
+                <option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option><option value="AM">AM</option>
+                <option value="BA">BA</option><option value="CE">CE</option><option value="DF">DF</option><option value="ES">ES</option>
+                <option value="GO">GO</option><option value="MA">MA</option><option value="MT">MT</option><option value="MS">MS</option>
+                <option value="MG">MG</option><option value="PA">PA</option><option value="PB">PB</option><option value="PR">PR</option>
+                <option value="PE">PE</option><option value="PI">PI</option><option value="RJ">RJ</option><option value="RN">RN</option>
+                <option value="RS">RS</option><option value="RO">RO</option><option value="RR">RR</option><option value="SC">SC</option>
+                <option value="SP">SP</option><option value="SE">SE</option><option value="TO">TO</option>
+              </select>
             </div>
           </div>
           <button class="btn btn-green" id="gobtn" onclick="go()"><i class="ti ti-search"></i> Buscar</button>
         </div>
         <div class="examples">
-          <span class="chip" onclick="sc('barbeiros','Barueri')">barbeiros · Barueri</span>
-          <span class="chip" onclick="sc('dentistas','Osasco')">dentistas · Osasco</span>
-          <span class="chip" onclick="sc('clínicas de estética','São Paulo')">estética · São Paulo</span>
-          <span class="chip" onclick="sc('academias','Alphaville')">academias · Alphaville</span>
-          <span class="chip" onclick="sc('contabilidade','Santana de Parnaíba')">contabilidade · Santana de Parnaíba</span>
-          <span class="chip" onclick="sc('restaurantes','SP')">restaurantes · SP</span>
-          <span class="chip" onclick="sc('advocacia','Rio de Janeiro')">advocacia · Rio de Janeiro</span>
+          <span class="chip" onclick="sc('barbeiros','Barueri','SP')">barbeiros · Barueri/SP</span>
+          <span class="chip" onclick="sc('dentistas','Osasco','SP')">dentistas · Osasco/SP</span>
+          <span class="chip" onclick="sc('clínicas de estética','São Paulo','SP')">estética · São Paulo/SP</span>
+          <span class="chip" onclick="sc('academias','Alphaville','SP')">academias · Alphaville/SP</span>
+          <span class="chip" onclick="sc('contabilidade','Santana de Parnaíba','SP')">contabilidade · Santana de Parnaíba/SP</span>
+          <span class="chip" onclick="sc('restaurantes','Campinas','SP')">restaurantes · Campinas/SP</span>
+          <span class="chip" onclick="sc('advocacia','Rio de Janeiro','RJ')">advocacia · Rio de Janeiro/RJ</span>
         </div>
         <div class="cgrid">
           <div class="ci"><label>Máximo de resultados</label>
@@ -373,7 +385,7 @@ let SB=null;
 
 // ─── Supabase client ──────────────────────────────────────────────────────────
 const CFG = window.PROSPECTAI_CONFIG || {};
-const cfgOk = CFG.url && CFG.anonKey && !CFG.url.includes('SEU-PROJETO');
+const cfgOk = CFG.url && CFG.anonKey && !CFG.url.includes('SEU-PROJETO') && !CFG.anonKey.includes('SUA-ANON-KEY');
 if(cfgOk){ try{ SB = window.supabase.createClient(CFG.url, CFG.anonKey); }catch(e){ console.error(e); } }
 
 function ls(k){return localStorage.getItem('prospectai_'+k)||''}
@@ -660,14 +672,17 @@ function nav(v){
   if(v==='pipeline')rp();
   if(v==='equipe')renderTeam();
 }
-function sc(seg,city){document.getElementById('cmd').value=seg;document.getElementById('city').value=city;document.getElementById('cmd').focus();}
+function sc(seg,city,uf){document.getElementById('cmd').value=seg;document.getElementById('city').value=city||'';document.getElementById('uf').value=uf||'';document.getElementById('cmd').focus();}
 
 // ─── Busca principal (agente) — inalterada ─────────────────────────────────────
 async function go(){
   if(busy)return;
   const seg=document.getElementById('cmd').value.trim();
-  const city=document.getElementById('city').value.trim();
+  const cityRaw=document.getElementById('city').value.trim();
+  const uf=document.getElementById('uf').value.trim();
   if(!seg){document.getElementById('cmd').focus();return;}
+  // junta cidade + estado num único local (ex: "Osasco SP")
+  const city=[cityRaw,uf].filter(Boolean).join(' ');
   const cmd=city?seg+' em '+city:seg;
   const placesKey=ls('pkey');
   if(!placesKey){alert('Configure sua Google Places API Key na aba Configurações primeiro.');nav('config');return;}
