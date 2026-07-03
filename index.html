@@ -322,8 +322,8 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
       <div class="info-box"><i class="ti ti-info-circle" style="font-size:16px;flex-shrink:0;margin-top:1px"></i>
         <span>As chaves de API ficam salvas <strong>só no seu navegador</strong> (localStorage). Os leads ficam no Supabase, compartilhados com sua equipe.</span></div>
       <div class="cfgcard">
-        <h2>APIs obrigatórias</h2>
-        <div class="sub">Sem essas duas, o agente não funciona.</div>
+        <h2>Chaves de API</h2>
+        <div class="sub">Só a Google Places é obrigatória (busca as empresas). A Anthropic é opcional — deixa a busca mais esperta e acha o decisor.</div>
         <div class="arow">
           <label>Google Places API Key <span class="req">*</span></label>
           <input type="password" id="cfg-places" placeholder="AIza..." autocomplete="off"/>
@@ -331,7 +331,7 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
           <a href="https://console.cloud.google.com/apis/library/places-backend.googleapis.com" target="_blank" class="alink"><i class="ti ti-external-link"></i> Criar grátis</a>
         </div>
         <div class="arow">
-          <label>Anthropic (Claude) API Key <span class="req">*</span></label>
+          <label>Anthropic (Claude) API Key <span style="color:var(--t3);font-weight:400">(opcional)</span></label>
           <input type="password" id="cfg-claude" placeholder="sk-ant-..." autocomplete="off"/>
           <span class="apistat" id="st-claude"><i class="ti ti-clock"></i> Pendente</span>
           <a href="https://console.anthropic.com/settings/keys" target="_blank" class="alink"><i class="ti ti-external-link"></i> Criar grátis</a>
@@ -1105,10 +1105,10 @@ function saveKeys(){
   const c=document.getElementById('cfg-claude').value.trim();
   const sk=document.getElementById('cfg-skey').value.trim();
   const scx=document.getElementById('cfg-scx').value.trim();
-  if(!p||!c){showMsg('Preencha pelo menos a Google Places Key e a Anthropic Key.','err');return;}
-  ss('pkey',p);ss('ckey',c);if(sk)ss('skey',sk);if(scx)ss('scx',scx);
-  setStat('places','ok');setStat('claude','ok');
-  showMsg('Chaves salvas com sucesso! Pode usar o agente agora.','ok');
+  if(!p){showMsg('Preencha pelo menos a Google Places Key (obrigatória).','err');return;}
+  ss('pkey',p); if(c)ss('ckey',c); if(sk)ss('skey',sk); if(scx)ss('scx',scx);
+  setStat('places','ok'); if(c)setStat('claude','ok');
+  showMsg(c?'Chaves salvas! Pode usar o agente agora.':'Google Places salva! Já dá pra buscar. (Anthropic é opcional — deixa a busca mais esperta.)','ok');
 }
 function clearKeys(){if(!confirm('Apagar todas as chaves salvas?'))return;['pkey','ckey','skey','scx'].forEach(k=>localStorage.removeItem('prospectai_'+k));setStat('places','pend');setStat('claude','pend');showMsg('Chaves removidas.','info');}
 async function testKeys(){
