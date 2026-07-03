@@ -248,6 +248,7 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
           <div class="ci"><label>Filtro mínimo</label>
             <select id="fmin"><option value="any">Qualquer resultado</option><option value="phone" selected>Tem telefone</option><option value="wpp">Tem WhatsApp</option></select></div>
         </div>
+        <div id="searchQuota" style="font-size:11px;color:var(--t3);margin-top:12px"></div>
       </div>
       <div class="ppanel" id="pp" style="display:none">
         <div class="phead"><span id="plabel">Iniciando...</span><span id="pcnt" style="color:var(--t3);font-weight:400"></span></div>
@@ -302,8 +303,13 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
     <div class="view" id="v-equipe">
       <div class="cfgcard">
         <h2>Convidar vendedores</h2>
-        <div class="sub">Passe este código para o vendedor. Ele cria a conta e escolhe "Entrar em empresa".</div>
-        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div class="sub">Mande o <strong>link de convite</strong> para o vendedor. Ele só cria a conta (nome, e-mail, senha) e já entra na sua empresa — sem digitar código.</div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+          <input id="inviteLink" readonly style="flex:1;min-width:260px;padding:9px 12px;border-radius:8px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:13px" value=""/>
+          <button class="btn btn-primary" onclick="copyInviteLink()"><i class="ti ti-link"></i> Copiar link de convite</button>
+        </div>
+        <div class="sub" style="margin:0">Ou passe só o código, se preferir:</div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px">
           <span class="codebox" id="joinCode">------</span>
           <button class="btn" onclick="copyCode()"><i class="ti ti-copy"></i> Copiar código</button>
         </div>
@@ -379,6 +385,8 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
 // ─── Estado ───────────────────────────────────────────────────────────────────
 let leads=[], results=[], busy=false, logLines=[];
 let me=null;              // { id, name, email, role, company_id }
+let pendingJoinCode=null; // código de convite vindo do link (#join=...)
+const DAILY_SEARCH_LIMIT=20; // buscas/dia por vendedor (admin sem limite)
 let usersById={};         // uuid -> { name, email, role }
 let company=null;         // { name, join_code }
 let SB=null;
@@ -405,8 +413,13 @@ async function init(){
 
   if(!SB){ showConfigNotice(); return; }
 
+  // link de convite: #join=CODIGO
+  const mh = location.hash.match(/join=([A-Za-z0-9]+)/);
+  if(mh){ pendingJoinCode = mh[1].toUpperCase(); }
+
   const { data:{ session } } = await SB.auth.getSession();
   if(session){ await afterLogin(session.user); }
+  else if(pendingJoinCode){ showSignup(); }
   else showLogin();
 
   SB.auth.onAuthStateChange((_ev, s)=>{
@@ -435,11 +448,14 @@ function showLogin(){
 }
 
 function showSignup(){
+  const convite = pendingJoinCode
+    ? `<div class="gate-msg ok" style="display:block">🎉 Você foi convidado! Crie sua conta abaixo e já entra na empresa.</div>`
+    : `<p class="sub">Depois você cria ou entra numa empresa</p>`;
   gate(`${gateLogo}
-    <h2>Criar conta</h2><p class="sub">Depois você cria ou entra numa empresa</p>
+    <h2>Criar conta</h2>${convite}
     <label>Seu nome</label><input id="g-name"/>
     <label>E-mail</label><input id="g-email" type="email" autocomplete="email"/>
-    <label>Senha</label><input id="g-pass" type="password" minlength="6" autocomplete="new-password"/>
+    <label>Senha</label><input id="g-pass" type="password" minlength="6" autocomplete="new-password" onkeydown="if(event.key==='Enter')doSignup()"/>
     <div class="gate-msg" id="gate-msg"></div>
     <button class="btn btn-primary" onclick="doSignup()">Criar conta</button>
     <div class="switch">Já tem conta? <a onclick="showLogin()">Entrar</a></div>`);
@@ -530,7 +546,15 @@ async function afterLogin(user){
     setTimeout(()=>afterLogin(user),600); return;
   }
   me=prof;
-  if(!me.company_id){ showOnboarding(); return; }
+  if(!me.company_id){
+    // veio por link de convite → entra automático, sem digitar código
+    if(pendingJoinCode){
+      const { error }=await SB.rpc('join_company', { p_code:pendingJoinCode });
+      pendingJoinCode=null;
+      if(!error){ await reloadMeAndBoot(); return; }
+    }
+    showOnboarding(); return;
+  }
   await boot();
 }
 
@@ -562,6 +586,7 @@ async function boot(){
   await loadTeam();
   await loadLeads();
   subscribe();
+  updateQuota();
 
   document.getElementById('sfooter').textContent = 'Conectado ✓';
 }
@@ -572,7 +597,17 @@ async function loadCompany(){
   if(company){
     document.getElementById('companyName').textContent=company.name;
     const jc=document.getElementById('joinCode'); if(jc) jc.textContent=company.join_code;
+    const il=document.getElementById('inviteLink');
+    if(il) il.value = location.origin + '/#join=' + company.join_code;
   }
+}
+
+function copyInviteLink(){
+  const il=document.getElementById('inviteLink'); if(!il) return;
+  navigator.clipboard?.writeText(il.value);
+  il.select?.();
+  const btn=event?.currentTarget;
+  if(btn){ const old=btn.innerHTML; btn.innerHTML='<i class="ti ti-check"></i> Link copiado!'; setTimeout(()=>btn.innerHTML=old,1200); }
 }
 
 async function loadTeam(){
@@ -610,7 +645,8 @@ function rowToLead(r){
   return { id:r.id, external_id:r.external_id, name:r.name, address:r.address, phone:r.phone,
     whatsapp:r.whatsapp, email:r.email, site:r.site, instagram:r.instagram, linkedin:r.linkedin,
     decisor:r.decisor, decisorCargo:r.decisor_cargo, rating:r.rating, totalRatings:r.total_ratings,
-    score:r.score, status:r.status, locked_by:r.locked_by, locked_at:r.locked_at, created_by:r.created_by };
+    score:r.score, status:r.status, locked_by:r.locked_by, locked_at:r.locked_at, created_by:r.created_by,
+    notes:r.notes||'', follow_up_at:r.follow_up_at||null };
 }
 function leadToRow(l){
   return { company_id:me.company_id, external_id:l.external_id||l.id||null, name:l.name, address:l.address||null,
@@ -671,8 +707,21 @@ function nav(v){
   if(v==='leads')rl();
   if(v==='pipeline')rp();
   if(v==='equipe')renderTeam();
+  if(v==='agente')updateQuota();
 }
 function sc(seg,city,uf){document.getElementById('cmd').value=seg;document.getElementById('city').value=city||'';document.getElementById('uf').value=uf||'';document.getElementById('cmd').focus();}
+
+// ─── Limite diário de buscas (por vendedor, no navegador) ──────────────────────
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function searchCount(){ return parseInt(ls('searches_'+(me?me.id:'x')+'_'+todayStr())||'0',10)||0; }
+function bumpSearch(){ ss('searches_'+(me?me.id:'x')+'_'+todayStr(), String(searchCount()+1)); }
+function updateQuota(){
+  const el=document.getElementById('searchQuota'); if(!el||!me) return;
+  if(me.role==='admin'){ el.textContent=''; return; }
+  const usadas=searchCount();
+  el.textContent='Buscas hoje: '+usadas+' / '+DAILY_SEARCH_LIMIT;
+  el.style.color = usadas>=DAILY_SEARCH_LIMIT ? 'var(--red)' : 'var(--t3)';
+}
 
 // ─── Busca principal (agente) — inalterada ─────────────────────────────────────
 async function go(){
@@ -686,6 +735,15 @@ async function go(){
   const cmd=city?seg+' em '+city:seg;
   const placesKey=ls('pkey');
   if(!placesKey){alert('Configure sua Google Places API Key na aba Configurações primeiro.');nav('config');return;}
+
+  // limite diário de buscas (vendedor). Admin não tem limite.
+  if(me && me.role!=='admin'){
+    if(searchCount() >= DAILY_SEARCH_LIMIT){
+      alert('Você atingiu o limite de '+DAILY_SEARCH_LIMIT+' buscas hoje. O contador zera amanhã.');
+      return;
+    }
+    bumpSearch(); updateQuota();
+  }
 
   busy=true; results=[]; logLines=[];
   const maxR=parseInt(document.getElementById('maxr').value);
@@ -963,8 +1021,9 @@ function rl(){
       actions+=`<button class="ibtn" title="Em contato" onclick="mvst('${l.id}','contato')"><i class="ti ti-arrow-right"></i></button>`;
       if(me.role==='admin') actions+=`<button class="ibtn r" title="Remover" onclick="rmv('${l.id}')"><i class="ti ti-trash"></i></button>`;
     }
+    const owner = (me.role==='admin' && l.created_by && l.created_by!==me.id) ? ` <span style="color:var(--t3);font-size:11px">· ${esc(usersById[l.created_by]?.name||'—')}</span>` : '';
     return `<tr>
-      <td><span class="cname" onclick="om('${l.id}')">${esc(l.name)}</span>${lockChip(l)}</td>
+      <td><span class="cname" onclick="om('${l.id}')">${esc(l.name)}</span>${notesDot(l)}${followChip(l)}${lockChip(l)}${owner}</td>
       <td style="font-family:monospace;font-size:11px">${l.phone?`<a href="tel:${l.phone.replace(/\D/g,'')}" style="color:inherit;text-decoration:none">${esc(l.phone)}</a>`:'—'}</td>
       <td>${pills(l)}</td>
       <td style="font-size:11px">${l.decisor?`<strong>${esc(l.decisor)}</strong>`:'<span style="color:var(--t3)">—</span>'}</td>
@@ -1019,9 +1078,9 @@ function rp(){
     const cards=items.map(l=>{
       const s=lockState(l);
       return `<div class="kcard ${s.other?'locked-other':''}" ${s.canManage?`draggable="true" ondragstart="dragStart(event,'${l.id}')" ondragend="dragEnd(event)"`:''} onclick="om('${l.id}')">
-        <div class="kname">${esc(l.name)}${lockChip(l)}</div>
+        <div class="kname">${esc(l.name)}${notesDot(l)}${lockChip(l)}</div>
         <div class="ksub">${esc(l.phone||l.address?.split(',')[1]?.trim()||'')}</div>
-        <div class="kpills">${pills(l)}</div>
+        <div class="kpills">${followChip(l)}${pills(l)}</div>
       </div>`;
     }).join('');
     return `<div class="kcol">
@@ -1076,6 +1135,14 @@ function om(id,fr=false){
     ${row('brand-instagram','Instagram',l.instagram?`<a href="https://instagram.com/${(l.instagram||'').replace('@','')}" target="_blank">${esc(l.instagram)}</a>`:null,'')}
     ${row('brand-linkedin','LinkedIn',l.linkedin?`<a href="https://${esc(l.linkedin)}" target="_blank">${esc(l.linkedin)}</a>`:null,'')}
     ${l.decisor?`<div class="msec">Decisor</div>${row('user','Nome',esc(l.decisor),'')}${row('briefcase','Cargo',esc(l.decisorCargo),'')}`:'' }
+    ${inCrm?`
+      <div class="msec">Observações & Agendamento</div>
+      <label style="font-size:12px;color:var(--t2);display:block;margin-bottom:4px">O que combinei / anotações da conversa</label>
+      <textarea id="lead-notes" rows="3" placeholder="Ex: Liguei dia 03/07, falei com a Ana, retornar semana que vem com proposta..." style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;resize:vertical;font-family:inherit">${esc(l.notes||'')}</textarea>
+      <label style="font-size:12px;color:var(--t2);display:block;margin:10px 0 4px">Agendar retorno (data e hora)</label>
+      <input id="lead-followup" type="datetime-local" value="${toLocalInput(l.follow_up_at)}" style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px"/>
+      <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="saveLeadDetails('${l.id}')"><i class="ti ti-device-floppy"></i> Salvar observação e agendamento</button>
+    `:''}
     <div class="mactions">
       ${!inCrm?`<button class="btn btn-green" onclick="addOne('${l.id}');nav('leads');cm()"><i class="ti ti-plus"></i> Add CRM</button>`:''}
       ${inCrm&&s.canManage&&!s.by?`<button class="btn btn-green" onclick="pegar('${l.id}');cm()"><i class="ti ti-hand-click"></i> Pegar lead</button>`:''}
@@ -1089,11 +1156,26 @@ function om(id,fr=false){
 }
 function cm(e){if(!e||e.target===document.getElementById('mov'))document.getElementById('mov').classList.remove('open');}
 
+// ─── Observações + Agendamento por lead ────────────────────────────────────────
+function toLocalInput(iso){ if(!iso) return ''; const d=new Date(iso); const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes()); }
+function fmtFollow(iso){ const d=new Date(iso); const p=n=>String(n).padStart(2,'0'); return p(d.getDate())+'/'+p(d.getMonth()+1)+' '+p(d.getHours())+':'+p(d.getMinutes()); }
+function followChip(l){ if(!l.follow_up_at) return ''; const over=new Date(l.follow_up_at)<new Date(); return `<span class="lockchip" style="background:${over?'var(--rbg)':'var(--pbg)'};color:${over?'var(--red)':'var(--purple)'}"><i class="ti ti-calendar"></i> ${fmtFollow(l.follow_up_at)}</span>`; }
+function notesDot(l){ return l.notes ? `<i class="ti ti-notes" title="${esc(l.notes).slice(0,120)}" style="color:var(--t3);margin-left:5px"></i>` : ''; }
+
+async function saveLeadDetails(id){
+  const notes=document.getElementById('lead-notes')?.value ?? '';
+  const fuRaw=document.getElementById('lead-followup')?.value || '';
+  const follow_up_at = fuRaw ? new Date(fuRaw).toISOString() : null;
+  const { error }=await SB.from('leads').update({ notes, follow_up_at }).eq('id',id);
+  if(error){ alert('Erro ao salvar: '+error.message); return; }
+  cm(); await loadLeads();
+}
+
 // ─── Exportar ─────────────────────────────────────────────────────────────────
 function exportCSV(){
   if(!leads.length){alert('Nenhum lead para exportar.');return;}
-  const h='Nome,Endereço,Telefone,WhatsApp,Email,Site,Instagram,LinkedIn,Decisor,Cargo,Score,Status,Travado por';
-  const rows=leads.map(l=>[l.name,l.address,l.phone,l.whatsapp,l.email,l.site,l.instagram,l.linkedin,l.decisor,l.decisorCargo,l.score,l.status,l.locked_by?(usersById[l.locked_by]?.name||''):''].map(v=>`"${(v||'').toString().replace(/"/g,'""')}"`).join(','));
+  const h='Nome,Endereço,Telefone,WhatsApp,Email,Site,Instagram,LinkedIn,Decisor,Cargo,Score,Status,Vendedor,Agendamento,Observações';
+  const rows=leads.map(l=>[l.name,l.address,l.phone,l.whatsapp,l.email,l.site,l.instagram,l.linkedin,l.decisor,l.decisorCargo,l.score,l.status,l.created_by?(usersById[l.created_by]?.name||''):'',l.follow_up_at?fmtFollow(l.follow_up_at):'',l.notes||''].map(v=>`"${(v||'').toString().replace(/"/g,'""')}"`).join(','));
   const a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,﻿'+encodeURIComponent(h+'\n'+rows.join('\n'));
   a.download='leads_prospectai_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
