@@ -130,6 +130,19 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
 .mval{color:var(--text);font-weight:600;text-align:right;max-width:250px;word-break:break-all}
 .mval a{color:var(--accent);text-decoration:none}.mval.none{color:var(--t3);font-weight:400}.mval.found{color:var(--green)}
 .mactions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.alarm-ov{display:none;position:fixed;inset:0;background:rgba(120,0,0,.35);z-index:200;align-items:center;justify-content:center;padding:16px}
+.alarm-ov.open{display:flex}
+.alarm-box{background:var(--surface);border:2px solid var(--red);border-radius:16px;padding:22px;width:100%;max-width:460px;max-height:85vh;overflow-y:auto;box-shadow:0 12px 50px rgba(220,38,38,.4);animation:alarmpulse 1s ease-in-out infinite}
+@keyframes alarmpulse{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.5)}50%{box-shadow:0 0 0 12px rgba(220,38,38,0)}}
+.alarm-head{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:800;color:var(--red);margin-bottom:14px}
+.alarm-head i{font-size:26px}
+.alarm-item{border:1px solid var(--border);border-left:4px solid var(--red);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.alarm-item .an{font-size:15px;font-weight:700}
+.alarm-item .at{font-size:12px;color:var(--red);font-weight:600;margin:3px 0}
+.alarm-item .ao{font-size:13px;color:var(--t2);margin-top:6px;white-space:pre-wrap}
+.alarm-item .arow{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.alarm-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+.btn.small{padding:5px 10px;font-size:12px}
 .info-box{background:var(--abg);border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;font-size:12px;color:#1e40af;margin-bottom:16px;display:flex;gap:8px;align-items:flex-start}
 .warn-box{background:var(--ambg);border:1px solid #fcd34d;border-radius:8px;padding:12px 16px;font-size:12px;color:#92400e;margin-bottom:16px;display:flex;gap:8px;align-items:flex-start}
 /* ── Multiusuário: auth, lock, user chip ── */
@@ -375,6 +388,18 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
   <div class="modal" id="mbody"></div>
 </div>
 
+<!-- ALARME DE AGENDAMENTO -->
+<div class="alarm-ov" id="alarm-ov">
+  <div class="alarm-box">
+    <div class="alarm-head"><i class="ti ti-bell-ringing"></i> Hora de retornar!</div>
+    <div id="alarm-body"></div>
+    <div class="alarm-actions">
+      <button class="btn" onclick="stopAlarmSound()"><i class="ti ti-volume-off"></i> Silenciar</button>
+      <button class="btn btn-primary" onclick="closeAlarm()"><i class="ti ti-check"></i> OK, ciente</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script>
@@ -401,6 +426,8 @@ function ss(k,v){localStorage.setItem('prospectai_'+k,v)}
 
 // ─── Boot ──────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', init);
+// destrava o som do alarme no primeiro clique/toque do usuário
+document.addEventListener('pointerdown', ensureAudio);
 
 async function init(){
   // chaves de API (localStorage, por navegador)
@@ -587,6 +614,12 @@ async function boot(){
   await loadLeads();
   subscribe();
   updateQuota();
+
+  // pede permissão de notificação e liga o verificador de agendamentos
+  if('Notification' in window && Notification.permission==='default'){ try{ Notification.requestPermission(); }catch(_){} }
+  if(alarmTimer) clearInterval(alarmTimer);
+  alarmTimer=setInterval(checkFollowUps, 20000);
+  setTimeout(checkFollowUps, 1500);
 
   document.getElementById('sfooter').textContent = 'Conectado ✓';
 }
@@ -1168,7 +1201,86 @@ async function saveLeadDetails(id){
   const follow_up_at = fuRaw ? new Date(fuRaw).toISOString() : null;
   const { error }=await SB.from('leads').update({ notes, follow_up_at }).eq('id',id);
   if(error){ alert('Erro ao salvar: '+error.message); return; }
-  cm(); await loadLeads();
+  // pede permissão de notificação do sistema ao agendar (só na 1ª vez)
+  if(follow_up_at && 'Notification' in window && Notification.permission==='default'){
+    try{ Notification.requestPermission(); }catch(_){}
+  }
+  ensureAudio();
+  cm(); await loadLeads(); checkFollowUps();
+}
+
+// ─── Alarme de agendamento (som + popup + notificação) ─────────────────────────
+let audioCtx=null, alarmInterval=null, alarmOpen=false, alarmTimer=null;
+function ensureAudio(){
+  try{
+    if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==='suspended') audioCtx.resume();
+  }catch(_){}
+}
+function beep(){
+  if(!audioCtx) return;
+  const t0=audioCtx.currentTime;
+  for(let i=0;i<3;i++){
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type='sine'; o.frequency.value=i%2?988:784;
+    o.connect(g); g.connect(audioCtx.destination);
+    const t=t0+i*0.28;
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.35,t+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+0.24);
+    o.start(t); o.stop(t+0.26);
+  }
+}
+function startAlarmSound(){ ensureAudio(); beep(); if(alarmInterval) clearInterval(alarmInterval); alarmInterval=setInterval(beep,2500); }
+function stopAlarmSound(){ if(alarmInterval){ clearInterval(alarmInterval); alarmInterval=null; } }
+
+function ackKey(l){ return l.id+'|'+(l.follow_up_at||''); }
+function isAcked(l){ return (ls('acked')||'').split('~').includes(ackKey(l)); }
+function ackLead(l){ const s=(ls('acked')||'').split('~').filter(Boolean); if(!s.includes(ackKey(l))){ s.push(ackKey(l)); ss('acked', s.slice(-400).join('~')); } }
+
+function dueLeads(){
+  const now=Date.now();
+  return leads.filter(l=> l.follow_up_at && new Date(l.follow_up_at).getTime()<=now && !isAcked(l));
+}
+function checkFollowUps(){
+  if(alarmOpen) return;
+  const due=dueLeads();
+  if(due.length) showAlarm(due);
+}
+function showAlarm(due){
+  alarmOpen=true;
+  document.getElementById('alarm-body').innerHTML = due.map(l=>`
+    <div class="alarm-item">
+      <div class="an">${esc(l.name)}</div>
+      <div class="at"><i class="ti ti-clock"></i> Agendado para ${fmtFollow(l.follow_up_at)}</div>
+      ${l.phone?`<div style="font-size:12px;color:var(--t2)">${esc(l.phone)}</div>`:''}
+      ${l.notes?`<div class="ao">📝 ${esc(l.notes)}</div>`:''}
+      <div class="arow">
+        ${l.whatsapp?`<button class="btn small btn-green" onclick="owpp('${l.whatsapp}')"><i class="ti ti-brand-whatsapp"></i> WhatsApp</button>`:''}
+        <button class="btn small" onclick="alarmOpenLead('${l.id}')"><i class="ti ti-eye"></i> Abrir lead</button>
+        <button class="btn small" onclick="snooze('${l.id}')"><i class="ti ti-alarm-snooze"></i> Adiar 10 min</button>
+      </div>
+    </div>`).join('');
+  document.getElementById('alarm-ov').classList.add('open');
+  startAlarmSound();
+  // notificação do sistema (aparece mesmo com a aba em 2º plano)
+  if('Notification' in window && Notification.permission==='granted'){
+    due.forEach(l=>{ try{ new Notification('⏰ Retornar: '+l.name, { body:(l.notes||'Hora do agendamento') }); }catch(_){} });
+  }
+  document.title='⏰ AGENDAMENTO! — ProspectAI';
+}
+function closeAlarm(){
+  dueLeads().forEach(ackLead);
+  stopAlarmSound();
+  document.getElementById('alarm-ov').classList.remove('open');
+  alarmOpen=false;
+  document.title='ProspectAI';
+}
+function alarmOpenLead(id){ const l=leads.find(x=>x.id===id); if(l) ackLead(l); closeAlarm(); om(id); }
+async function snooze(id){
+  const when=new Date(Date.now()+10*60000).toISOString();
+  await SB.from('leads').update({ follow_up_at:when }).eq('id',id);
+  closeAlarm(); await loadLeads();
 }
 
 // ─── Exportar ─────────────────────────────────────────────────────────────────
