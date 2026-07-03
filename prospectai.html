@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ProspectAI — CRM B2B</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.x/dist/tabler-icons.min.css"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#f5f5f3;--surface:#fff;--s2:#f9f9f8;--border:#e5e4e2;--bstrong:#d0d0ce;--text:#1a1a18;--t2:#5a5958;--t3:#9a9998;--accent:#2563eb;--abg:#eff6ff;--green:#16a34a;--gbg:#f0fdf4;--purple:#7c3aed;--pbg:#f5f3ff;--red:#dc2626;--rbg:#fef2f2;--amber:#d97706;--ambg:#fffbeb;--r:8px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh}
+.app{display:flex;height:100vh;overflow:hidden}
+aside{width:210px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.logo{display:flex;align-items:center;gap:10px;padding:16px;border-bottom:1px solid var(--border)}
+.logo-icon{width:32px;height:32px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;flex-shrink:0}
+.logo-name{font-size:14px;font-weight:700;color:var(--text)}
+.logo-sub{font-size:10px;color:var(--t3)}
+.nav-sec{display:block;font-size:10px;color:var(--t3);padding:14px 14px 4px;text-transform:uppercase;letter-spacing:.05em}
+.nav-item{display:flex;align-items:center;gap:8px;padding:8px 14px;font-size:13px;color:var(--t2);text-decoration:none;cursor:pointer;position:relative;transition:background .1s}
+.nav-item:hover{background:var(--bg);color:var(--text)}
+.nav-item.active{background:var(--abg);color:var(--accent);font-weight:600}
+.nav-item.active::after{content:'';position:absolute;right:0;top:0;bottom:0;width:2px;background:var(--accent)}
+.nav-item i{font-size:16px}
+.nbadge{margin-left:auto;background:var(--accent);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;min-width:18px;text-align:center}
+.sfooter{margin-top:auto;padding:12px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--t3)}
+main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--surface);border-bottom:1px solid var(--border)}
+.topbar h1{font-size:15px;font-weight:700}
+.tactions{display:flex;gap:8px}
+.content{flex:1;overflow-y:auto;padding:20px}
+.view{display:none}.view.active{display:block}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--r);border:1px solid var(--bstrong);background:var(--surface);color:var(--text);font-size:13px;cursor:pointer;transition:background .1s;white-space:nowrap}
+.btn:hover{background:var(--bg)}.btn:active{transform:scale(.98)}
+.btn-primary{background:var(--text);color:#fff;border-color:var(--text)}.btn-primary:hover{opacity:.85;background:var(--text)}
+.btn-green{background:var(--green);color:#fff;border-color:var(--green)}.btn-green:hover{opacity:.9;background:var(--green)}
+.btn-amber{background:var(--amber);color:#fff;border-color:var(--amber)}.btn-amber:hover{opacity:.9;background:var(--amber)}
+.abox{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+.ahead{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.aicon{width:40px;height:40px;background:var(--abg);color:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.atitle{font-size:15px;font-weight:700}.adesc{font-size:12px;color:var(--t3)}
+.crow{display:flex;gap:8px;margin-bottom:12px}
+.crow input{flex:1;padding:9px 14px;border-radius:var(--r);border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px}
+.crow input:focus{outline:none;border-color:var(--accent);background:var(--surface)}
+.examples{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.chip{padding:4px 12px;border-radius:20px;border:1px solid var(--border);background:var(--s2);font-size:11px;color:var(--t2);cursor:pointer}
+.chip:hover{border-color:var(--accent);color:var(--accent);background:var(--abg)}
+.cgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.ci label{display:block;font-size:11px;color:var(--t3);margin-bottom:4px}
+.ci select,.ci input{width:100%;padding:7px 10px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px}
+.ppanel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px}
+.phead{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:13px;font-weight:600}
+.stagebar{display:flex;gap:4px;margin-bottom:8px}
+.stage{flex:1;text-align:center;padding:5px 4px;border-radius:var(--r);font-size:10px;font-weight:600;background:var(--bg);color:var(--t3);border:1px solid var(--border);transition:all .3s}
+.stage.active{border-color:var(--accent);background:var(--abg);color:var(--accent)}
+.stage.done{border-color:var(--green);background:var(--gbg);color:var(--green)}
+.pbar{height:4px;background:var(--border);border-radius:2px;margin-bottom:12px}
+.pfill{height:100%;border-radius:2px;background:var(--accent);transition:width .5s}
+.logbox{font-family:'SF Mono','Fira Code',monospace;font-size:11px;color:var(--t2);background:var(--bg);border-radius:6px;padding:10px;max-height:110px;overflow-y:auto}
+.ll{padding:1px 0}.lt{color:var(--t3)}.lok{color:var(--green)}.lwarn{color:var(--amber)}.linfo{color:var(--accent)}
+.rheader{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.rtitle{font-size:14px;font-weight:700}
+.sgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.sc{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px}
+.slabel{font-size:11px;color:var(--t3);margin-bottom:4px}
+.sval{font-size:26px;font-weight:700;color:var(--text)}
+.sval.g{color:var(--green)}.sval.b{color:var(--accent)}.sval.p{color:var(--purple)}
+.frow{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.frow input{flex:1;min-width:180px;padding:7px 12px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px}
+.frow input:focus{outline:none;border-color:var(--accent)}
+.frow select{padding:7px 10px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px}
+.twrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+th{font-size:11px;color:var(--t3);text-align:left;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:600;white-space:nowrap}
+td{font-size:12px;padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg)}
+th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:14%}th:nth-child(3),td:nth-child(3){width:18%}th:nth-child(4),td:nth-child(4){width:15%}th:nth-child(5),td:nth-child(5){width:9%}th:nth-child(6),td:nth-child(6){width:10%}th:nth-child(7),td:nth-child(7){width:12%}
+.cname{font-weight:600;color:var(--accent);cursor:pointer}.cname:hover{text-decoration:underline}
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap}
+.bnovo{background:var(--abg);color:var(--accent)}.benriq{background:var(--ambg);color:var(--amber)}.bpronto{background:var(--gbg);color:var(--green)}.bcontato{background:var(--pbg);color:var(--purple)}.bperd{background:var(--rbg);color:var(--red)}
+.pills{display:flex;gap:3px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:2px;padding:2px 6px;border-radius:20px;font-size:10px;white-space:nowrap}
+.pwpp{background:#dcfce7;color:#15803d}.pmail{background:#dbeafe;color:#1d4ed8}.pig{background:#fce7f3;color:#9d174d}.pli{background:#e0f2fe;color:#0369a1}
+.sbwrap{display:flex;align-items:center;gap:6px}
+.sbbar{flex:1;height:4px;background:var(--border);border-radius:2px;min-width:36px}
+.sbfill{height:100%;border-radius:2px}
+.snum{font-size:10px;color:var(--t3);width:26px;text-align:right}
+.abtns{display:flex;gap:3px}
+.ibtn{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;color:var(--t2)}
+.ibtn:hover{background:var(--bg);color:var(--text)}
+.ibtn.g:hover{background:var(--gbg);color:var(--green);border-color:var(--green)}
+.ibtn.r:hover{background:var(--rbg);color:var(--red);border-color:var(--red)}
+.kanban{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;align-items:start}
+.kcol{background:var(--bg);border-radius:10px;padding:10px}
+.khead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:12px;font-weight:700;color:var(--t2)}
+.kcnt{background:var(--border);color:var(--t3);font-size:10px;padding:1px 7px;border-radius:10px}
+.kcards{display:flex;flex-direction:column;gap:8px;min-height:40px}
+.kcard{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px;cursor:grab;transition:border-color .15s,transform .15s,opacity .15s;user-select:none}.kcard:hover{border-color:var(--accent);transform:translateY(-1px)}.kcard:active{cursor:grabbing;opacity:.5;transform:scale(.97)}.kcards.drag-over{background:var(--abg)!important}
+.kcard:hover{border-color:var(--accent)}
+.kname{font-size:12px;font-weight:600;margin-bottom:3px}
+.ksub{font-size:10px;color:var(--t3)}
+.kpills{margin-top:6px;display:flex;gap:3px;flex-wrap:wrap}
+.empty{text-align:center;padding:48px 20px;color:var(--t3)}
+.empty i{font-size:40px;display:block;margin-bottom:12px}
+.empty p{font-size:13px}
+.cfgcard{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+.cfgcard h2{font-size:14px;font-weight:700;margin-bottom:4px}
+.cfgcard .sub{font-size:12px;color:var(--t3);margin-bottom:16px}
+.arow{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.arow label{font-size:12px;color:var(--t2);width:200px;flex-shrink:0;font-weight:500}
+.arow input{flex:1;min-width:180px;padding:7px 10px;border-radius:var(--r);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;font-family:monospace}
+.arow input:focus{outline:none;border-color:var(--accent);background:var(--surface)}
+.alink{font-size:11px;color:var(--accent);text-decoration:none;display:inline-flex;align-items:center;gap:3px;white-space:nowrap}
+.alink:hover{text-decoration:underline}
+.req{color:var(--red)}
+.cfgmsg{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:12px;display:none}
+.cfgmsg.ok{background:var(--gbg);color:var(--green)}.cfgmsg.err{background:var(--rbg);color:var(--red)}.cfgmsg.info{background:var(--abg);color:var(--accent)}
+.apistat{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.aok{background:var(--gbg);color:var(--green)}.apend{background:var(--ambg);color:var(--amber)}
+.modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center;padding:16px}
+.modal-ov.open{display:flex}
+.modal{background:var(--surface);border-radius:14px;border:1px solid var(--border);padding:20px;width:100%;max-width:480px;max-height:85vh;overflow-y:auto}
+.mtitle{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;gap:10px}
+.mtitle h3{font-size:16px;font-weight:700}
+.msec{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px}
+.mrow{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px}
+.mrow:last-of-type{border-bottom:none}
+.mlabel{color:var(--t2);display:flex;align-items:center;gap:6px}
+.mval{color:var(--text);font-weight:600;text-align:right;max-width:250px;word-break:break-all}
+.mval a{color:var(--accent);text-decoration:none}.mval.none{color:var(--t3);font-weight:400}.mval.found{color:var(--green)}
+.mactions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.info-box{background:var(--abg);border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;font-size:12px;color:#1e40af;margin-bottom:16px;display:flex;gap:8px;align-items:flex-start}
+.warn-box{background:var(--ambg);border:1px solid #fcd34d;border-radius:8px;padding:12px 16px;font-size:12px;color:#92400e;margin-bottom:16px;display:flex;gap:8px;align-items:flex-start}
+</style>
+</head>
+<body>
+<div class="app">
+<aside>
+  <div class="logo">
+    <div class="logo-icon"><i class="ti ti-radar"></i></div>
+    <div><div class="logo-name">ProspectAI</div><div class="logo-sub">CRM B2B</div></div>
+  </div>
+  <span class="nav-sec">Principal</span>
+  <div class="nav-item active" onclick="nav('agente')"><i class="ti ti-robot"></i> Agente IA</div>
+  <div class="nav-item" onclick="nav('leads')"><i class="ti ti-users"></i> Leads <span class="nbadge" id="nb">0</span></div>
+  <div class="nav-item" onclick="nav('pipeline')"><i class="ti ti-layout-kanban"></i> Pipeline</div>
+  <span class="nav-sec">Sistema</span>
+  <div class="nav-item" onclick="nav('config')"><i class="ti ti-settings"></i> Configurações</div>
+  <div class="sfooter" id="sfooter">Configure as APIs para começar</div>
+</aside>
+
+<main>
+  <div class="topbar">
+    <h1 id="ptitle">Agente de prospecção</h1>
+    <div class="tactions">
+      <button class="btn" onclick="exportCSV()"><i class="ti ti-download"></i> Exportar CSV</button>
+      <button class="btn btn-primary" onclick="nav('agente')"><i class="ti ti-plus"></i> Nova busca</button>
+    </div>
+  </div>
+  <div class="content">
+
+    <!-- AGENTE -->
+    <div class="view active" id="v-agente">
+      <div class="abox">
+        <div class="ahead">
+          <div class="aicon"><i class="ti ti-robot"></i></div>
+          <div><div class="atitle">Agente de prospecção B2B</div><div class="adesc">Digite um comando em linguagem natural</div></div>
+        </div>
+        <div class="crow">
+          <div style="flex:1;display:flex;gap:8px">
+            <div style="flex:1.4;position:relative">
+              <i class="ti ti-briefcase" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--t3);font-size:15px;pointer-events:none"></i>
+              <input type="text" id="cmd" placeholder="Segmento — ex: dentistas, barbeiros, estética..." onkeydown="if(event.key==='Enter')go()" style="width:100%;padding-left:32px"/>
+            </div>
+            <div style="flex:1;position:relative">
+              <i class="ti ti-map-pin" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--t3);font-size:15px;pointer-events:none"></i>
+              <input type="text" id="city" placeholder="Cidade ou estado — ex: Osasco, SP..." onkeydown="if(event.key==='Enter')go()" style="width:100%;padding-left:32px"/>
+            </div>
+          </div>
+          <button class="btn btn-green" id="gobtn" onclick="go()"><i class="ti ti-search"></i> Buscar</button>
+        </div>
+        <div class="examples">
+          <span class="chip" onclick="sc('barbeiros','Barueri')">barbeiros · Barueri</span>
+          <span class="chip" onclick="sc('dentistas','Osasco')">dentistas · Osasco</span>
+          <span class="chip" onclick="sc('clínicas de estética','São Paulo')">estética · São Paulo</span>
+          <span class="chip" onclick="sc('academias','Alphaville')">academias · Alphaville</span>
+          <span class="chip" onclick="sc('contabilidade','Santana de Parnaíba')">contabilidade · Santana de Parnaíba</span>
+          <span class="chip" onclick="sc('restaurantes','SP')">restaurantes · SP</span>
+          <span class="chip" onclick="sc('advocacia','Rio de Janeiro')">advocacia · Rio de Janeiro</span>
+        </div>
+        <div class="cgrid">
+          <div class="ci"><label>Máximo de resultados</label>
+            <select id="maxr"><option value="20">20 empresas</option><option value="50" selected>50 empresas</option><option value="100">100 empresas</option></select></div>
+          <div class="ci"><label>Enriquecimento</label>
+            <select id="enrmode"><option value="full" selected>Completo (site + Google)</option><option value="basic">Básico (só Places)</option></select></div>
+          <div class="ci"><label>Filtro mínimo</label>
+            <select id="fmin"><option value="any">Qualquer resultado</option><option value="phone" selected>Tem telefone</option><option value="wpp">Tem WhatsApp</option></select></div>
+        </div>
+      </div>
+      <div class="ppanel" id="pp" style="display:none">
+        <div class="phead"><span id="plabel">Iniciando...</span><span id="pcnt" style="color:var(--t3);font-weight:400"></span></div>
+        <div class="stagebar">
+          <div class="stage" id="s1">Descoberta</div><div class="stage" id="s2">Varredura</div>
+          <div class="stage" id="s3">Enriquecimento</div><div class="stage" id="s4">IA</div><div class="stage" id="s5">Pronto</div>
+        </div>
+        <div class="pbar"><div class="pfill" id="pf" style="width:0%"></div></div>
+        <div class="logbox" id="lb"></div>
+      </div>
+      <div id="rsec" style="display:none">
+        <div class="rheader"><span class="rtitle" id="rsum"></span>
+          <button class="btn btn-green" onclick="addAll()"><i class="ti ti-check"></i> Adicionar todos ao CRM</button></div>
+        <div id="rtable"></div>
+      </div>
+    </div>
+
+    <!-- LEADS -->
+    <div class="view" id="v-leads">
+      <div class="sgrid">
+        <div class="sc"><div class="slabel">Total</div><div class="sval" id="st">0</div></div>
+        <div class="sc"><div class="slabel">WhatsApp</div><div class="sval g" id="sw">0</div></div>
+        <div class="sc"><div class="slabel">E-mail</div><div class="sval b" id="se">0</div></div>
+        <div class="sc"><div class="slabel">Prontos</div><div class="sval p" id="sr">0</div></div>
+      </div>
+      <div class="frow">
+        <input type="text" id="fq" placeholder="Buscar por nome, endereço..." oninput="rl()"/>
+        <select id="fst" onchange="rl()">
+          <option value="">Todos</option><option value="novo">Novo</option><option value="enriquecendo">Enriquecendo</option>
+          <option value="pronto">Pronto</option><option value="contato">Em contato</option><option value="perdido">Perdido</option>
+        </select>
+      </div>
+      <div class="twrap"><table><thead><tr>
+        <th>Empresa</th><th>Telefone</th><th>Contatos</th><th>Decisor</th><th>Score</th><th>Status</th><th>Ações</th>
+      </tr></thead><tbody id="ltbody"></tbody></table>
+      <div class="empty" id="le" style="display:none"><i class="ti ti-users"></i><p>Nenhum lead ainda.</p></div></div>
+    </div>
+
+    <!-- PIPELINE -->
+    <div class="view" id="v-pipeline">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <span style="font-size:12px;color:var(--t3)">Clique no nome da coluna para renomear · Arraste os cards entre colunas</span>
+        <div style="display:flex;gap:8px">
+          <button class="btn" onclick="addKanbanCol()"><i class="ti ti-plus"></i> Nova coluna</button>
+          <button class="btn" onclick="resetKanbanCols()" style="color:var(--red)"><i class="ti ti-refresh"></i> Restaurar padrão</button>
+        </div>
+      </div>
+      <div class="kanban" id="kanban-board"></div>
+      <div class="empty" id="pe" style="display:none"><i class="ti ti-layout-kanban"></i><p>Nenhum lead no pipeline.</p></div>
+    </div>
+
+    <!-- CONFIG -->
+    <div class="view" id="v-config">
+      <div class="info-box"><i class="ti ti-info-circle" style="font-size:16px;flex-shrink:0;margin-top:1px"></i>
+        <span>As chaves ficam salvas <strong>só no seu navegador</strong> (localStorage). Nunca saem do seu computador.</span></div>
+      <div class="cfgcard">
+        <h2>APIs obrigatórias</h2>
+        <div class="sub">Sem essas duas, o agente não funciona.</div>
+        <div class="arow">
+          <label>Google Places API Key <span class="req">*</span></label>
+          <input type="password" id="cfg-places" placeholder="AIza..." autocomplete="off"/>
+          <span class="apistat" id="st-places"><i class="ti ti-clock"></i> Pendente</span>
+          <a href="https://console.cloud.google.com/apis/library/places-backend.googleapis.com" target="_blank" class="alink"><i class="ti ti-external-link"></i> Criar grátis</a>
+        </div>
+        <div class="arow">
+          <label>Anthropic (Claude) API Key <span class="req">*</span></label>
+          <input type="password" id="cfg-claude" placeholder="sk-ant-..." autocomplete="off"/>
+          <span class="apistat" id="st-claude"><i class="ti ti-clock"></i> Pendente</span>
+          <a href="https://console.anthropic.com/settings/keys" target="_blank" class="alink"><i class="ti ti-external-link"></i> Criar grátis</a>
+        </div>
+        <div class="cfgcard" style="background:var(--s2);margin:16px 0 0;padding:14px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px">Google Custom Search (opcional — acha o decisor)</div>
+          <div class="arow">
+            <label>Search API Key</label>
+            <input type="password" id="cfg-skey" placeholder="AIza..." autocomplete="off"/>
+            <a href="https://console.cloud.google.com/apis/library/customsearch.googleapis.com" target="_blank" class="alink"><i class="ti ti-external-link"></i> Ativar</a>
+          </div>
+          <div class="arow">
+            <label>Search Engine ID (CX)</label>
+            <input type="text" id="cfg-scx" placeholder="017576..." autocomplete="off"/>
+            <a href="https://programmablesearchengine.google.com/controlpanel/all" target="_blank" class="alink"><i class="ti ti-external-link"></i> Criar CX</a>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <button class="btn btn-primary" onclick="saveKeys()"><i class="ti ti-device-floppy"></i> Salvar chaves</button>
+          <button class="btn btn-amber" onclick="testKeys()"><i class="ti ti-plug"></i> Testar conexão</button>
+          <button class="btn" onclick="clearKeys()" style="color:var(--red);border-color:var(--red)"><i class="ti ti-trash"></i> Limpar chaves</button>
+        </div>
+        <div class="cfgmsg" id="cfgmsg"></div>
+      </div>
+      <div class="warn-box"><i class="ti ti-alert-triangle" style="font-size:16px;flex-shrink:0;margin-top:1px"></i>
+        <span>Para o Places API funcionar no browser, você precisa <strong>liberar CORS e domínio</strong> na sua chave Google. Vá em Restrições da chave → Referers HTTP → adicione <code style="background:#fef3c7;padding:1px 5px;border-radius:4px">file:///*</code> e <code style="background:#fef3c7;padding:1px 5px;border-radius:4px">*localhost*</code></span></div>
+    </div>
+
+  </div>
+</main>
+</div>
+
+<!-- MODAL -->
+<div class="modal-ov" id="mov" onclick="cm(event)">
+  <div class="modal" id="mbody"></div>
+</div>
+
+<script>
+// ─── Estado ───────────────────────────────────────────────────────────────────
+let leads=[], results=[], busy=false, logLines=[];
+
+// ─── Carregar chaves salvas ───────────────────────────────────────────────────
+window.onload=()=>{
+  const p=ls('pkey'), c=ls('ckey');
+  if(p) document.getElementById('cfg-places').value=p;
+  if(c) document.getElementById('cfg-claude').value=c;
+  const sk=ls('skey'), scx=ls('scx');
+  if(sk) document.getElementById('cfg-skey').value=sk;
+  if(scx) document.getElementById('cfg-scx').value=scx;
+  if(p&&c){
+    setStat('places','ok'); setStat('claude','ok');
+    document.getElementById('sfooter').textContent='APIs configuradas ✓';
+  }
+  // carregar leads salvos
+  const saved=ls('leads');
+  if(saved){try{leads=JSON.parse(saved);}catch(e){}}
+  updateStats(); document.getElementById('nb').textContent=leads.length;
+};
+
+function ls(k){return localStorage.getItem('prospectai_'+k)||''}
+function ss(k,v){localStorage.setItem('prospectai_'+k,v)}
+function key(k){return document.getElementById('cfg-'+k).value.trim()||ls(k.replace('-',''))}
+
+// ─── Nav ──────────────────────────────────────────────────────────────────────
+const titles={agente:'Agente de prospecção',leads:'Leads',pipeline:'Pipeline',config:'Configurações'};
+function nav(v){
+  document.querySelectorAll('.view').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
+  document.getElementById('v-'+v).classList.add('active');
+  document.querySelectorAll('.nav-item')[['agente','leads','pipeline','_','config'].indexOf(v)]?.classList.add('active');
+  document.getElementById('ptitle').textContent=titles[v]||v;
+  if(v==='leads')rl();
+  if(v==='pipeline')rp();
+}
+function sc(seg,city){document.getElementById('cmd').value=seg;document.getElementById('city').value=city;document.getElementById('cmd').focus();}
+
+// ─── Busca principal ──────────────────────────────────────────────────────────
+async function go(){
+  if(busy)return;
+  const seg=document.getElementById('cmd').value.trim();
+  const city=document.getElementById('city').value.trim();
+  if(!seg){document.getElementById('cmd').focus();return;}
+  const cmd=city?seg+' em '+city:seg;
+  const placesKey=ls('pkey');
+  if(!placesKey){alert('Configure sua Google Places API Key na aba Configurações primeiro.');nav('config');return;}
+
+  busy=true; results=[]; logLines=[];
+  const maxR=parseInt(document.getElementById('maxr').value);
+  const enrMode=document.getElementById('enrmode').value;
+
+  showP(true); document.getElementById('rsec').style.display='none';
+
+  try{
+    // Passo 1: Interpretar comando
+    sp(5,'Interpretando comando...','');
+    st(1,'active'); log('Analisando: "'+cmd+'"','info');
+    const parsed=await parseCmd(cmd, city);
+    log('Segmento: '+parsed.segment+' | Cidade: '+parsed.city,'ok');
+
+    // Passo 2: Google Places
+    sp(15,'Buscando no Google Places...','');
+    st(1,'done');st(2,'active');
+    log('Consultando Google Places API...','info');
+    const rawLeads=await searchPlaces(parsed.searchQuery, maxR, placesKey);
+    log(rawLeads.length+' empresas encontradas','ok');
+    sp(35,'Empresas encontradas','0 / '+rawLeads.length);
+
+    // Passo 3: Filtro
+    const fm=document.getElementById('fmin').value;
+    let filtered=rawLeads;
+    if(fm==='phone') filtered=rawLeads.filter(l=>l.phone);
+    if(fm==='wpp') filtered=rawLeads.filter(l=>l.whatsapp);
+    log('Após filtro: '+filtered.length+' leads válidos','ok');
+
+    // Passo 4: Enriquecimento
+    st(2,'done');st(3,'active');
+    if(enrMode==='full'){
+      log('Varrendo sites para extrair contatos...','info');
+      for(let i=0;i<filtered.length;i+=5){
+        const batch=filtered.slice(i,i+5);
+        const enriched=await Promise.all(batch.map(l=>l.site?enrichSite(l).catch(()=>l):Promise.resolve(l)));
+        enriched.forEach((el,idx)=>{filtered[i+idx]=el;});
+        const done=Math.min(i+5,filtered.length);
+        sp(40+Math.round((done/filtered.length)*35),'Enriquecendo... '+done+'/'+filtered.length,done+' / '+filtered.length);
+        const w=filtered.filter(l=>l.whatsapp).length, em=filtered.filter(l=>l.email).length;
+        if(done%10===0||done===filtered.length) log(w+' WhatsApp · '+em+' e-mails encontrados','ok');
+      }
+      st(3,'done');st(4,'active');
+
+      // Busca decisor via Google Custom Search
+      const skey=ls('skey'), scx=ls('scx');
+      if(skey&&scx){
+        log('Buscando decisores via Google Search...','info');
+        for(let i=0;i<Math.min(filtered.length,20);i++){
+          if(!filtered[i].decisor){
+            try{ filtered[i]=await enrichDecissor(filtered[i],skey,scx); }catch(e){}
+          }
+        }
+        const d=filtered.filter(l=>l.decisor).length;
+        log(d+' decisores identificados','ok');
+      } else {
+        log('Google Custom Search não configurado — pulando busca de decisor','warn');
+      }
+      st(4,'done');
+    } else { st(3,'done');st(4,'done'); log('Modo básico — só Places','warn'); }
+
+    // Score
+    filtered.forEach(l=>{
+      let s=0;
+      if(l.email)s+=25; if(l.whatsapp)s+=35; if(l.instagram)s+=15; if(l.decisor)s+=25;
+      l.score=s;
+      l.status=s>=60?'pronto':s>=25?'enriquecendo':'novo';
+    });
+
+    st(5,'active'); sp(100,'Concluído!',''); st(5,'done');
+    results=filtered;
+    const w=filtered.filter(l=>l.whatsapp).length, em=filtered.filter(l=>l.email).length, d=filtered.filter(l=>l.decisor).length;
+    log('Busca finalizada: '+filtered.length+' leads · '+w+' WPP · '+em+' email · '+d+' decisores','ok');
+    showResults(filtered,{w,em,d});
+  }catch(err){log('Erro: '+err.message,'warn');console.error(err);}
+  finally{busy=false;}
+}
+
+// ─── Places API ──────────────────────────────────────────────────────────────
+async function searchPlaces(query, max, key){
+  // Places API v1 — tem CORS habilitado para chamadas diretas do browser
+  const headers={'Content-Type':'application/json','X-Goog-Api-Key':key,'X-Goog-FieldMask':'places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount'};
+  const body={textQuery:query,languageCode:'pt-BR',regionCode:'BR',maxResultCount:Math.min(max,20)};
+  const r=await fetch('https://places.googleapis.com/v1/places:searchText',{method:'POST',headers,body:JSON.stringify(body)});
+  if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error('Places API erro '+(e.error?.message||r.status));}
+  const data=await r.json();
+  let places=data.places||[];
+  if(max>20&&data.nextPageToken){
+    try{
+      const r2=await fetch('https://places.googleapis.com/v1/places:searchText',{method:'POST',headers,body:JSON.stringify({...body,pageToken:data.nextPageToken})});
+      if(r2.ok){const d2=await r2.json();places=[...places,...(d2.places||[])];}
+    }catch(_){}
+  }
+  return places.slice(0,max).filter(p=>p.displayName?.text).map(p=>({
+    id:p.id,name:p.displayName.text,address:p.formattedAddress||'',
+    phone:p.nationalPhoneNumber||null,
+    site:p.websiteUri?p.websiteUri.replace(/\/$/,''):null,
+    rating:p.rating||null,totalRatings:p.userRatingCount||0,
+    status:'novo',whatsapp:null,email:null,instagram:null,linkedin:null,decisor:null,decisorCargo:null,score:0
+  }));
+}
+
+// ─── Enriquecimento do site ───────────────────────────────────────────────────
+async function enrichSite(lead){
+  const base=lead.site.startsWith('http')?lead.site:'https://'+lead.site;
+  const pages=['','/contato','/sobre','/contact','/about'];
+  const r={...lead};
+
+  for(const pg of pages){
+    try{
+      const res=await fetch(base+pg,{signal:AbortSignal.timeout(5000),headers:{'User-Agent':'Mozilla/5.0'}});
+      if(!res.ok)continue;
+      const html=await res.text();
+
+      // E-mails
+      if(!r.email){
+        const em=(html.match(/[\w.+-]+@[\w.-]+\.\w{2,}/g)||[]).find(e=>!e.includes('sentry')&&!e.includes('example')&&!e.includes('.png')&&!e.includes('.jpg'));
+        if(em)r.email=em;
+      }
+      // WhatsApp
+      if(!r.whatsapp){
+        const wm=html.match(/(?:wa\.me|api\.whatsapp\.com\/send\?phone=)[^\d]*([\d]{10,13})/);
+        if(wm)r.whatsapp='+'+wm[1];
+        else{
+          // número no texto próximo à palavra "whatsapp"
+          const wt=html.toLowerCase().match(/whatsapp[^<]{0,60}(\(?\d{2}\)?[\s-]?\d{4,5}[\s-]?\d{4})/);
+          if(wt)r.whatsapp=wt[1].replace(/\D/g,'');
+        }
+      }
+      // Instagram
+      if(!r.instagram){
+        const ig=html.match(/instagram\.com\/([\w.]{3,}?)(?:\/|"|'|\s|>)/);
+        if(ig&&!['p','reel','explore','stories'].includes(ig[1]))r.instagram='@'+ig[1];
+      }
+      // LinkedIn
+      if(!r.linkedin){
+        const li=html.match(/linkedin\.com\/(?:in|company)\/([\w-]+)/);
+        if(li)r.linkedin='linkedin.com/in/'+li[1];
+      }
+    }catch(_){}
+  }
+
+  // Se não achou WhatsApp mas tem telefone, usa o telefone
+  if(!r.whatsapp&&r.phone) r.whatsapp=r.phone;
+  return r;
+}
+
+// ─── Google Custom Search + Claude ───────────────────────────────────────────
+async function enrichDecissor(lead, skey, scx){
+  const r={...lead};
+  const q=encodeURIComponent('"'+lead.name+'" dono proprietário site:instagram.com OR site:linkedin.com');
+  const url=`https://www.googleapis.com/customsearch/v1?q=${q}&key=${skey}&cx=${scx}&num=5`;
+  const res=await fetch(url,{signal:AbortSignal.timeout(5000)});
+  const data=await res.json();
+  const items=data.items||[];
+  if(!items.length)return r;
+
+  const snippets=items.map(i=>i.title+'\n'+i.snippet).join('\n\n');
+  const ckey=ls('ckey');
+  if(!ckey)return r;
+
+  const msg=await callClaude('Extraia o nome e cargo do dono/proprietário/decisor da empresa "'+lead.name+'" com base nos resultados abaixo. Responda APENAS JSON: {"nome":"...","cargo":"..."} ou {"nome":null}\n\n'+snippets.substring(0,1500),100,ckey);
+  try{
+    const j=msg.match(/\{[\s\S]+\}/)?.[0];
+    const d=j?JSON.parse(j):null;
+    if(d?.nome){r.decisor=d.nome;r.decisorCargo=d.cargo;}
+  }catch(_){}
+  return r;
+}
+
+// ─── Claude API ───────────────────────────────────────────────────────────────
+async function callClaude(prompt, maxTok=300, apiKey){
+  const key=apiKey||ls('ckey');
+  if(!key)throw new Error('Claude API Key não configurada');
+  const res=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:maxTok,messages:[{role:'user',content:prompt}]})
+  });
+  const data=await res.json();
+  if(!res.ok)throw new Error(data.error?.message||'Claude error');
+  return data.content[0].text;
+}
+
+// ─── Parse do comando ─────────────────────────────────────────────────────────
+async function parseCmd(cmd, explicitCity=''){
+  // Se cidade foi digitada explicitamente, prioriza ela
+  const cityToUse = explicitCity || '';
+  const ckey=ls('ckey');
+  if(ckey){
+    try{
+      const prompt=cityToUse
+        ? `Interprete este segmento de negócio e responda APENAS JSON sem markdown:\nSegmento: "${cmd}"\nCidade/Estado: "${cityToUse}"\n\nFormato: {"segment":"tipo de negócio","city":"${cityToUse}","searchQuery":"${cmd} ${cityToUse}"}`
+        : `Interprete este comando de prospecção e responda APENAS JSON sem markdown:\n"${cmd}"\n\nFormato: {"segment":"tipo de negócio","city":"cidade ou São Paulo","searchQuery":"query em pt-BR para Google Places"}`;
+      const txt=await callClaude(prompt,150,ckey);
+      const j=txt.replace(/\`\`\`json?|\`\`\`/g,'').trim();
+      const parsed=JSON.parse(j);
+      if(cityToUse) parsed.city=cityToUse;
+      parsed.searchQuery=`${parsed.segment||cmd} ${parsed.city||cityToUse||'São Paulo'}`;
+      return parsed;
+    }catch(e){}
+  }
+  // fallback sem Claude
+  const c=cmd.toLowerCase();
+  const resolvedCity=cityToUse||(['barueri','osasco','são paulo','alphaville','santana de parnaíba','guarulhos','campinas','santo andré','abc','carapicuíba'].find(x=>c.includes(x))||'São Paulo');
+  const segMap=[['barb','Barbearia'],['dent','Odontologia'],['estet','Estética'],['acad','Academia'],['restaur','Restaurante'],['contab','Contabilidade'],['clínic','Clínica'],['clinic','Clínica'],['advocac','Advocacia'],['imob','Imobiliária']];
+  const seg=segMap.find(([k])=>c.includes(k))?.[1]||cmd;
+  return{segment:seg,city:resolvedCity,searchQuery:`${seg} ${resolvedCity}`};
+}
+
+// ─── Exibir resultados ────────────────────────────────────────────────────────
+function showResults(list,stats){
+  document.getElementById('rsum').textContent=`${list.length} leads — ${stats.w} WhatsApp · ${stats.em} e-mails · ${stats.d} decisores`;
+  const rows=list.map(l=>`<tr>
+    <td><span class="cname" onclick="om('${l.id}',true)">${l.name}</span></td>
+    <td style="font-family:monospace;font-size:11px">${l.phone?`<a href="tel:${l.phone.replace(/\D/g,'')}" style="color:inherit;text-decoration:none">${l.phone}</a>`:'—'}</td>
+    <td>${pills(l)}</td>
+    <td style="font-size:11px">${l.decisor?`<strong>${l.decisor}</strong>`:'<span style="color:var(--t3)">—</span>'}</td>
+    <td>${sb(l.score||0)}</td>
+    <td>${badge(l.status)}</td>
+    <td><div class="abtns">
+      <button class="ibtn g" title="Add CRM" onclick="addOne('${l.id}')"><i class="ti ti-plus"></i></button>
+      <button class="ibtn" title="Ver" onclick="om('${l.id}',true)"><i class="ti ti-eye"></i></button>
+      ${l.whatsapp?`<button class="ibtn g" title="WhatsApp" onclick="owpp('${l.whatsapp}')"><i class="ti ti-brand-whatsapp"></i></button>`:''}
+    </div></td>
+  </tr>`).join('');
+  document.getElementById('rtable').innerHTML=`<div class="twrap"><table><thead><tr><th>Empresa</th><th>Telefone</th><th>Contatos</th><th>Decisor</th><th>Score</th><th>Status</th><th>Ações</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  document.getElementById('rsec').style.display='block';
+}
+
+// ─── CRM ──────────────────────────────────────────────────────────────────────
+function addOne(id){
+  const l=results.find(x=>x.id===id);
+  if(l&&!leads.find(x=>x.id===id)){leads.push({...l,addedAt:new Date().toLocaleDateString('pt-BR')});save();}
+}
+function addAll(){
+  results.forEach(l=>{if(!leads.find(x=>x.id===l.id))leads.push({...l,addedAt:new Date().toLocaleDateString('pt-BR')});});
+  save(); nav('leads');
+}
+function save(){updateStats();ss('leads',JSON.stringify(leads));document.getElementById('nb').textContent=leads.length;}
+function updateStats(){
+  document.getElementById('st').textContent=leads.length;
+  document.getElementById('sw').textContent=leads.filter(l=>l.whatsapp).length;
+  document.getElementById('se').textContent=leads.filter(l=>l.email).length;
+  document.getElementById('sr').textContent=leads.filter(l=>l.status==='pronto').length;
+}
+function mvst(id,st){const l=leads.find(x=>x.id===id);if(l){l.status=st;save();rl();rp();}}
+
+function getStatusLabel(st){
+  const cols=getKanbanCols();
+  return cols.find(c=>c.id===st)?.label||st;
+}
+function rmv(id){leads=leads.filter(x=>x.id!==id);save();rl();rp();}
+
+function rl(){
+  const q=(document.getElementById('fq').value||'').toLowerCase();
+  const st=document.getElementById('fst').value||'';
+  const f=leads.filter(l=>(!q||l.name?.toLowerCase().includes(q)||l.address?.toLowerCase().includes(q))&&(!st||l.status===st));
+  const tb=document.getElementById('ltbody'),em=document.getElementById('le');
+  if(!f.length){tb.innerHTML='';em.style.display='block';return;}
+  em.style.display='none';
+  tb.innerHTML=f.map(l=>`<tr>
+    <td><span class="cname" onclick="om('${l.id}')">${l.name}</span></td>
+    <td style="font-family:monospace;font-size:11px">${l.phone?`<a href="tel:${l.phone.replace(/\D/g,'')}" style="color:inherit;text-decoration:none">${l.phone}</a>`:'—'}</td>
+    <td>${pills(l)}</td>
+    <td style="font-size:11px">${l.decisor?`<strong>${l.decisor}</strong>`:'<span style="color:var(--t3)">—</span>'}</td>
+    <td>${sb(l.score||0)}</td>
+    <td>${badge(l.status)}</td>
+    <td><div class="abtns">
+      ${l.whatsapp?`<button class="ibtn g" title="WhatsApp" onclick="owpp('${l.whatsapp}')"><i class="ti ti-brand-whatsapp"></i></button>`:''}
+      <button class="ibtn" title="Ver" onclick="om('${l.id}')"><i class="ti ti-eye"></i></button>
+      <button class="ibtn" title="Em contato" onclick="mvst('${l.id}','contato')"><i class="ti ti-arrow-right"></i></button>
+      <button class="ibtn r" title="Remover" onclick="rmv('${l.id}')"><i class="ti ti-trash"></i></button>
+    </div></td>
+  </tr>`).join('');
+}
+
+// ─── Kanban dinâmico ─────────────────────────────────────────────────────────
+const DEFAULT_COLS=[
+  {id:'novo',label:'Novo'},
+  {id:'enriquecendo',label:'Enriquecendo'},
+  {id:'pronto',label:'Pronto'},
+  {id:'contato',label:'Em contato'},
+  {id:'perdido',label:'Perdido'}
+];
+
+function getKanbanCols(){
+  try{const s=ls('kcols');if(s)return JSON.parse(s);}catch(_){}
+  return DEFAULT_COLS;
+}
+
+function saveKanbanCols(cols){ss('kcols',JSON.stringify(cols));}
+
+function addKanbanCol(){
+  const label=prompt('Nome da nova coluna:');
+  if(!label||!label.trim())return;
+  const cols=getKanbanCols();
+  const id='col_'+Date.now();
+  cols.push({id,label:label.trim()});
+  saveKanbanCols(cols);
+  rp();
+}
+
+function resetKanbanCols(){
+  if(!confirm('Restaurar colunas padrão? Os leads serão mantidos.'))return;
+  // Mapear status customizados para 'novo'
+  const cols=getKanbanCols();
+  const defaultIds=DEFAULT_COLS.map(c=>c.id);
+  leads.forEach(l=>{if(!defaultIds.includes(l.status))l.status='novo';});
+  localStorage.removeItem('prospectai_kcols');
+  save();rp();
+}
+
+function renameCol(id){
+  const cols=getKanbanCols();
+  const col=cols.find(c=>c.id===id);
+  if(!col)return;
+  const newLabel=prompt('Novo nome da coluna:',col.label);
+  if(!newLabel||!newLabel.trim())return;
+  col.label=newLabel.trim();
+  saveKanbanCols(cols);
+  rp();
+}
+
+function removeCol(id){
+  const cols=getKanbanCols();
+  if(cols.length<=1){alert('Mantenha pelo menos uma coluna.');return;}
+  const col=cols.find(c=>c.id===id);
+  if(!confirm(`Remover coluna "${col?.label}"? Os leads serão movidos para a primeira coluna.`))return;
+  leads.forEach(l=>{if(l.status===id)l.status=cols.find(c=>c.id!==id)?.id||'novo';});
+  const newCols=cols.filter(c=>c.id!==id);
+  saveKanbanCols(newCols);
+  save();rp();
+}
+
+function rp(){
+  const cols=getKanbanCols();
+  const board=document.getElementById('kanban-board');
+  if(!board)return;
+
+  board.style.display='grid';
+  board.style.gridTemplateColumns=`repeat(${cols.length},minmax(160px,1fr))`;
+  board.style.gap='12px';
+  board.style.alignItems='start';
+
+  board.innerHTML=cols.map(col=>{
+    const items=leads.filter(l=>l.status===col.id);
+    const cards=items.map(l=>`
+      <div class="kcard" draggable="true"
+        ondragstart="dragStart(event,'${l.id}')"
+        ondragend="dragEnd(event)"
+        onclick="om('${l.id}')">
+        <div class="kname">${l.name}</div>
+        <div class="ksub">${l.phone||l.address?.split(',')[1]?.trim()||''}</div>
+        <div class="kpills">${pills(l)}</div>
+      </div>`).join('');
+    return `<div class="kcol">
+      <div class="khead">
+        <span class="col-label" onclick="renameCol('${col.id}')" title="Clique para renomear" style="cursor:pointer;border-bottom:1px dashed var(--border);padding-bottom:1px">${col.label}</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="kcnt">${items.length}</span>
+          <button onclick="removeCol('${col.id}')" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:13px;padding:0;line-height:1" title="Remover coluna"><i class="ti ti-x"></i></button>
+        </div>
+      </div>
+      <div class="kcards" id="cards-${col.id}"
+        ondragover="dragOver(event)"
+        ondragleave="dragLeave(event)"
+        ondrop="drop(event,'${col.id}')"
+        style="min-height:80px;padding:4px;border-radius:8px;transition:background .15s">${cards}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('pe').style.display=leads.length?'none':'block';
+
+  // Atualizar select de status nos filtros
+  const fst=document.getElementById('fst');
+  if(fst){
+    const cur=fst.value;
+    fst.innerHTML='<option value="">Todos</option>'+cols.map(c=>`<option value="${c.id}">${c.label}</option>`).join('');
+    if(cur)fst.value=cur;
+  }
+}
+
+// ─── Drag and drop ────────────────────────────────────────────────────────────
+let draggedId=null;
+
+function dragStart(e,id){
+  draggedId=id;
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/plain',id);
+  setTimeout(()=>{
+    const el=e.target;
+    if(el) el.style.opacity='0.4';
+  },0);
+}
+
+function dragEnd(e){
+  if(e.target) e.target.style.opacity='1';
+  draggedId=null;
+}
+
+function dragOver(e){
+  e.preventDefault();
+  e.dataTransfer.dropEffect='move';
+  const col=e.currentTarget;
+  col.style.background='var(--abg)';
+  col.style.borderRadius='10px';
+}
+
+function dragLeave(e){
+  const col=e.currentTarget;
+  col.style.background='var(--bg)';
+}
+
+function drop(e,colId){
+  e.preventDefault();
+  e.stopPropagation();
+  const col=e.currentTarget;
+  col.style.background='var(--bg)';
+  const id=e.dataTransfer.getData('text/plain')||draggedId;
+  if(!id)return;
+  const l=leads.find(x=>x.id===id);
+  if(l&&l.status!==colId){
+    l.status=colId;
+    save();
+    rp();
+  }
+  draggedId=null;
+}
+
+// ─── Modal ────────────────────────────────────────────────────────────────────
+function om(id,fr=false){
+  const pool=fr?results:leads;
+  const l=pool.find(x=>x.id===id)||leads.find(x=>x.id===id)||results.find(x=>x.id===id);
+  if(!l)return;
+  const inCrm=!!leads.find(x=>x.id===id);
+  const row=(ic,lb,val,cls='')=>`<div class="mrow"><span class="mlabel"><i class="ti ti-${ic}"></i> ${lb}</span><span class="mval ${cls||(!val?'none':'found')}">${val||'Não encontrado'}</span></div>`;
+  document.getElementById('mbody').innerHTML=`
+    <div class="mtitle"><h3>${l.name}</h3><button class="ibtn" onclick="cm()" aria-label="Fechar"><i class="ti ti-x"></i></button></div>
+    ${row('map-pin','Endereço',l.address,'')}
+    ${l.rating?row('star','Avaliação',l.rating+' ★ ('+l.totalRatings+' avaliações)',''):'' }
+    <div class="msec">Contatos</div>
+    ${row('phone','Telefone',l.phone,'')}
+    ${row('brand-whatsapp','WhatsApp',l.whatsapp?`<a href="https://wa.me/${(l.whatsapp||'').replace(/\D/g,'')}" target="_blank">${l.whatsapp}</a>`:null,'')}
+    ${row('mail','E-mail',l.email?`<a href="mailto:${l.email}">${l.email}</a>`:null,'')}
+    ${row('world','Site',l.site?`<a href="${l.site.startsWith('http')?l.site:'https://'+l.site}" target="_blank">${l.site}</a>`:null,'')}
+    ${row('brand-instagram','Instagram',l.instagram?`<a href="https://instagram.com/${(l.instagram||'').replace('@','')}" target="_blank">${l.instagram}</a>`:null,'')}
+    ${row('brand-linkedin','LinkedIn',l.linkedin?`<a href="https://${l.linkedin}" target="_blank">${l.linkedin}</a>`:null,'')}
+    ${l.decisor?`<div class="msec">Decisor</div>${row('user','Nome',l.decisor,'')}${row('briefcase','Cargo',l.decisorCargo,'')}`:'' }
+    <div class="mactions">
+      ${!inCrm?`<button class="btn btn-green" onclick="addOne('${l.id}');nav('leads');cm()"><i class="ti ti-plus"></i> Add CRM</button>`:''}
+      ${inCrm?`<button class="btn" onclick="mvst('${l.id}','contato');rl();rp()"><i class="ti ti-arrow-right"></i> Em contato</button>`:''}
+      ${l.whatsapp?`<button class="btn btn-green" onclick="owpp('${l.whatsapp}')"><i class="ti ti-brand-whatsapp"></i> WhatsApp</button>`:''}
+      ${l.email?`<button class="btn" onclick="window.open('mailto:${l.email}')"><i class="ti ti-mail"></i> E-mail</button>`:''}
+    </div>
+  `;
+  document.getElementById('mov').classList.add('open');
+}
+function cm(e){if(!e||e.target===document.getElementById('mov'))document.getElementById('mov').classList.remove('open');}
+
+// ─── Exportar ─────────────────────────────────────────────────────────────────
+function exportCSV(){
+  if(!leads.length){alert('Nenhum lead para exportar.');return;}
+  const h='Nome,Endereço,Telefone,WhatsApp,Email,Site,Instagram,LinkedIn,Decisor,Cargo,Score,Status';
+  const rows=leads.map(l=>[l.name,l.address,l.phone,l.whatsapp,l.email,l.site,l.instagram,l.linkedin,l.decisor,l.decisorCargo,l.score,l.status].map(v=>`"${(v||'').toString().replace(/"/g,'""')}"`).join(','));
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(h+'\n'+rows.join('\n'));
+  a.download='leads_prospectai_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+}
+
+// ─── Config ───────────────────────────────────────────────────────────────────
+function saveKeys(){
+  const p=document.getElementById('cfg-places').value.trim();
+  const c=document.getElementById('cfg-claude').value.trim();
+  const sk=document.getElementById('cfg-skey').value.trim();
+  const scx=document.getElementById('cfg-scx').value.trim();
+  if(!p||!c){showMsg('Preencha pelo menos a Google Places Key e a Anthropic Key.','err');return;}
+  ss('pkey',p);ss('ckey',c);if(sk)ss('skey',sk);if(scx)ss('scx',scx);
+  setStat('places','ok');setStat('claude','ok');
+  document.getElementById('sfooter').textContent='APIs configuradas ✓';
+  showMsg('Chaves salvas com sucesso! Pode usar o agente agora.','ok');
+}
+function clearKeys(){if(!confirm('Apagar todas as chaves salvas?'))return;['pkey','ckey','skey','scx'].forEach(k=>localStorage.removeItem('prospectai_'+k));setStat('places','pend');setStat('claude','pend');showMsg('Chaves removidas.','info');}
+async function testKeys(){
+  const p=document.getElementById('cfg-places').value.trim()||ls('pkey');
+  const c=document.getElementById('cfg-claude').value.trim()||ls('ckey');
+  if(!p){showMsg('Informe a Google Places API Key.','err');return;}
+  showMsg('Testando...','info');
+  try{
+    const r=await fetch(`https://maps.googleapis.com/maps/api/place/textsearch/json?query=teste&key=${p}`);
+    const d=await r.json();
+    if(d.status==='REQUEST_DENIED'){showMsg('Google Places: chave inválida ou sem permissão. Verifique restrições da chave.','err');return;}
+    setStat('places','ok');
+    if(c){
+      try{await callClaude('diga apenas ok',5,c);setStat('claude','ok');showMsg('Tudo conectado! Google Places ✓ e Claude ✓','ok');}
+      catch(e){showMsg('Places OK mas Claude com erro: '+e.message,'err');}
+    } else showMsg('Google Places OK ✓ — configure a Anthropic Key também.','ok');
+  }catch(e){showMsg('Erro: '+e.message,'err');}
+}
+function setStat(k,s){const el=document.getElementById('st-'+k);if(!el)return;el.className='apistat '+(s==='ok'?'aok':'apend');el.innerHTML=s==='ok'?'<i class="ti ti-check"></i> Conectado':'<i class="ti ti-clock"></i> Pendente';}
+function showMsg(txt,t){const m=document.getElementById('cfgmsg');m.className='cfgmsg '+t;m.textContent=txt;m.style.display='block';}
+
+// ─── Helpers UI ───────────────────────────────────────────────────────────────
+function pills(l){const p=[];if(l.whatsapp)p.push(`<a href="https://wa.me/55${l.whatsapp.replace(/\D/g,'')}" target="_blank" class="pill pwpp" style="text-decoration:none"><i class="ti ti-brand-whatsapp"></i> WPP</a>`);if(l.email)p.push(`<a href="mailto:${l.email}" class="pill pmail" style="text-decoration:none"><i class="ti ti-mail"></i> Email</a>`);if(l.instagram)p.push(`<a href="https://instagram.com/${l.instagram.replace('@','')}" target="_blank" class="pill pig" style="text-decoration:none"><i class="ti ti-brand-instagram"></i> IG</a>`);if(l.linkedin)p.push(`<a href="https://${l.linkedin}" target="_blank" class="pill pli" style="text-decoration:none"><i class="ti ti-brand-linkedin"></i> LI</a>`);return p.length?'<div class="pills">'+p.join('')+'</div>':'<span style="color:var(--t3);font-size:11px">—</span>';}
+function badge(s){
+  const m={novo:'bnovo',enriquecendo:'benriq',pronto:'bpronto',contato:'bcontato',perdido:'bperd'};
+  const cls=m[s]||'bnovo';
+  const label=getStatusLabel(s);
+  return`<span class="badge ${cls}">${label}</span>`;
+}
+function sb(s){const col=s>=60?'var(--green)':s>=25?'var(--amber)':'var(--t3)';return`<div class="sbwrap"><div class="sbbar"><div class="sbfill" style="width:${s}%;background:${col}"></div></div><span class="snum">${s}</span></div>`;}
+function owpp(p){window.open('https://wa.me/55'+p.replace(/\D/g,''),'_blank');}
+
+// ─── Progress ────────────────────────────────────────────────────────────────
+function showP(s){document.getElementById('pp').style.display=s?'block':'none';if(s){document.getElementById('pf').style.width='0%';[1,2,3,4,5].forEach(i=>{const e=document.getElementById('s'+i);if(e)e.className='stage';});}}
+function sp(p,l,c){document.getElementById('pf').style.width=p+'%';document.getElementById('plabel').textContent=l;if(c!==undefined)document.getElementById('pcnt').textContent=c;}
+function st(n,c){const e=document.getElementById('s'+n);if(e)e.className='stage '+c;}
+function log(m,t='info'){const tm=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});const c=t==='ok'?'lok':t==='warn'?'lwarn':'linfo';logLines.push(`<div class="ll"><span class="lt">[${tm}]</span> <span class="${c}">${m}</span></div>`);const b=document.getElementById('lb');b.innerHTML=logLines.slice(-25).join('');b.scrollTop=b.scrollHeight;}
+</script>
+</body>
+</html>
