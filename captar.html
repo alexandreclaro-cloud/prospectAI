@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Fale com a gente</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:linear-gradient(135deg,#eef2ff,#f5f3ff);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;color:#1a1a18}
+  .card{background:#fff;border-radius:18px;box-shadow:0 12px 50px rgba(0,0,0,.10);padding:32px;width:100%;max-width:440px}
+  .logo{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .logo .i{width:36px;height:36px;border-radius:9px;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800}
+  h1{font-size:20px;margin-bottom:4px}
+  p.sub{color:#6b7280;font-size:14px;margin-bottom:20px}
+  label{display:block;font-size:13px;color:#374151;margin:12px 0 5px;font-weight:600}
+  input,textarea{width:100%;padding:12px 13px;border:1px solid #d1d5db;border-radius:10px;font-size:15px}
+  input:focus,textarea:focus{outline:none;border-color:#2563eb}
+  button{width:100%;margin-top:20px;padding:14px;border:none;border-radius:11px;background:#2563eb;color:#fff;font-size:16px;font-weight:700;cursor:pointer}
+  button:disabled{opacity:.6}
+  .msg{margin-top:16px;padding:14px;border-radius:10px;font-size:14px;display:none}
+  .msg.ok{background:#f0fdf4;color:#16a34a;display:block}
+  .msg.err{background:#fef2f2;color:#dc2626;display:block}
+  .done{text-align:center;padding:20px 0}
+  .done .big{font-size:44px}
+  .foot{margin-top:18px;text-align:center;font-size:11px;color:#9ca3af}
+</style>
+</head>
+<body>
+  <div class="card" id="card">
+    <div class="logo"><div class="i">P</div><strong>Fale com a gente</strong></div>
+    <h1>Deixe seu contato</h1>
+    <p class="sub">Preencha e um consultor entra em contato rapidinho. 🚀</p>
+
+    <form id="f" onsubmit="enviar(event)">
+      <label>Nome *</label>
+      <input id="nome" required autocomplete="name"/>
+      <label>WhatsApp / Telefone *</label>
+      <input id="fone" required inputmode="tel" placeholder="(11) 99999-9999"/>
+      <label>E-mail</label>
+      <input id="email" type="email" autocomplete="email"/>
+      <label>Mensagem (opcional)</label>
+      <textarea id="msg" rows="2" placeholder="Conta rapidamente o que você precisa..."></textarea>
+      <div class="msg" id="feedback"></div>
+      <button id="btn" type="submit">Quero falar com um consultor</button>
+    </form>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>
+const CFG=window.PROSPECTAI_CONFIG||{};
+const SB=(CFG.url&&CFG.anonKey)?window.supabase.createClient(CFG.url,CFG.anonKey):null;
+const params=new URLSearchParams(location.search);
+const CODE=(params.get('c')||params.get('empresa')||'').toUpperCase();      // ?c=CODIGO
+const CAMPAIGN=params.get('campanha')||params.get('utm_campaign')||null;     // ?campanha=...
+const SOURCE=params.get('fonte')||params.get('utm_source')||'landing';       // ?fonte=meta
+
+function fb(t,cls){ const m=document.getElementById('feedback'); m.className='msg '+cls; m.textContent=t; }
+
+async function enviar(e){
+  e.preventDefault();
+  if(!SB){ fb('Formulário não configurado (config.js).','err'); return; }
+  if(!CODE){ fb('Link inválido: falta o código da empresa (?c=...).','err'); return; }
+  const nome=document.getElementById('nome').value.trim();
+  const fone=document.getElementById('fone').value.trim();
+  const email=document.getElementById('email').value.trim()||null;
+  const msg=document.getElementById('msg').value.trim()||null;
+  const btn=document.getElementById('btn');
+  btn.disabled=true; btn.textContent='Enviando...';
+  const { error }=await SB.rpc('capture_lead',{
+    p_code:CODE, p_name:nome, p_phone:fone, p_email:email,
+    p_campaign:CAMPAIGN, p_source:SOURCE,
+    p_payload: msg?{mensagem:msg}:null
+  });
+  if(error){
+    btn.disabled=false; btn.textContent='Quero falar com um consultor';
+    fb('Não foi possível enviar: '+error.message,'err'); return;
+  }
+  document.getElementById('card').innerHTML=`
+    <div class="done">
+      <div class="big">✅</div>
+      <h1>Recebido!</h1>
+      <p class="sub" style="margin-top:8px">Obrigado, ${nome.split(' ')[0]||''}! Um consultor vai te chamar em instantes.</p>
+    </div>
+    <div class="foot">ProspectAI</div>`;
+}
+</script>
+</body>
+</html>
