@@ -189,6 +189,7 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
   </div>
   <span class="nav-sec">Atendimento</span>
   <div class="nav-item" data-nav="atendimento" onclick="nav('atendimento')"><i class="ti ti-headset"></i> Atendimento <span class="nbadge" id="nb-at" style="display:none">0</span></div>
+  <div class="nav-item" data-nav="whatsapp" onclick="nav('whatsapp')"><i class="ti ti-brand-whatsapp"></i> WhatsApp <span class="nbadge" id="nb-wa" style="display:none;background:var(--green)">0</span></div>
   <span class="nav-sec">Prospecção</span>
   <div class="nav-item active" data-nav="agente" onclick="nav('agente')"><i class="ti ti-robot"></i> Agente IA</div>
   <div class="nav-item" data-nav="leads" onclick="nav('leads')"><i class="ti ti-users"></i> Leads <span class="nbadge" id="nb">0</span></div>
@@ -310,6 +311,46 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
         <th>Lead</th><th>Contato</th><th>Origem / Campanha</th><th>Responsável</th><th>SLA 1ª resposta</th><th>Status</th><th>Ações</th>
       </tr></thead><tbody id="at-tbody"></tbody></table>
       <div class="empty" id="at-empty" style="display:none"><i class="ti ti-headset"></i><p>Nenhum lead de atendimento ainda. Compartilhe o link de captura.</p></div></div>
+    </div>
+
+    <!-- WHATSAPP (inbox) -->
+    <div class="view" id="v-whatsapp">
+      <div id="wa-setup" style="display:none">
+        <div class="cfgcard">
+          <h2>Conectar o WhatsApp (Z-API)</h2>
+          <div class="sub">Cole os dados da sua instância Z-API dedicada ao ProspectAI. (Só o admin vê e edita.)</div>
+          <div class="arow"><label>Instance ID</label><input id="wa-instance" placeholder="3F4FB2AD..."/></div>
+          <div class="arow"><label>Token</label><input id="wa-token" placeholder="token da instância"/></div>
+          <div class="arow"><label>Client-Token</label><input id="wa-clienttoken" placeholder="Security Token da conta Z-API"/></div>
+          <div class="arow"><label>Número (só exibição)</label><input id="wa-number" placeholder="5511999999999"/></div>
+          <div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-primary" onclick="saveWaSettings()"><i class="ti ti-device-floppy"></i> Salvar conexão</button></div>
+          <div class="cfgmsg" id="wa-msg"></div>
+        </div>
+        <div class="warn-box"><i class="ti ti-webhook" style="font-size:16px;flex-shrink:0;margin-top:1px"></i>
+          <span>No painel da Z-API, em <strong>"Ao receber"</strong>, cole esta URL de webhook:
+          <input id="wa-webhook-url" readonly style="width:100%;margin-top:6px;padding:7px 10px;border-radius:6px;border:1px solid #fcd34d;font-size:11px;font-family:monospace" value=""/>
+          <button class="btn small" style="margin-top:6px" onclick="copyWebhook()"><i class="ti ti-copy"></i> Copiar webhook</button></span></div>
+      </div>
+
+      <div id="wa-inbox" style="display:none">
+        <div style="display:flex;gap:14px;height:calc(100vh - 130px)">
+          <div style="flex:0 0 300px;border:1px solid var(--border);border-radius:12px;background:var(--surface);overflow-y:auto">
+            <div style="padding:12px 14px;border-bottom:1px solid var(--border);font-weight:700;font-size:13px;display:flex;justify-content:space-between;align-items:center">
+              <span><i class="ti ti-brand-whatsapp" style="color:var(--green)"></i> Conversas</span>
+              <button class="ibtn" title="Config" onclick="waShowSetup()"><i class="ti ti-settings"></i></button>
+            </div>
+            <div id="wa-convlist"></div>
+          </div>
+          <div style="flex:1;border:1px solid var(--border);border-radius:12px;background:var(--surface);display:flex;flex-direction:column;overflow:hidden">
+            <div id="wa-thread-head" style="padding:12px 14px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px">Selecione uma conversa</div>
+            <div id="wa-thread" style="flex:1;overflow-y:auto;padding:14px;background:var(--bg);display:flex;flex-direction:column;gap:8px"></div>
+            <div id="wa-composer" style="display:none;padding:10px;border-top:1px solid var(--border);gap:8px">
+              <input id="wa-input" placeholder="Escreva uma mensagem..." onkeydown="if(event.key==='Enter')sendWa()" style="flex:1;padding:10px 12px;border-radius:8px;border:1px solid var(--bstrong);font-size:14px"/>
+              <button class="btn btn-green" onclick="sendWa()"><i class="ti ti-send"></i> Enviar</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- LEADS -->
@@ -445,6 +486,7 @@ let leads=[], results=[], busy=false, logLines=[];
 let me=null;              // { id, name, email, role, company_id }
 let pendingJoinCode=null; // código de convite vindo do link (#join=...)
 const DAILY_SEARCH_LIMIT=20; // buscas/dia por vendedor (admin sem limite)
+let waSettings=null, waMessages=[], waActivePhone=null; // inbox WhatsApp
 let usersById={};         // uuid -> { name, email, role }
 let company=null;         // { name, join_code }
 let SB=null;
@@ -647,6 +689,13 @@ async function boot(){
   await loadLeads();
   subscribe();
   updateQuota();
+
+  // WhatsApp: carrega config, mensagens e liga o tempo real
+  await loadWaSettings();
+  await loadWaMessages();
+  const _convs=waConversations(); const _nbw=document.getElementById('nb-wa');
+  if(_nbw){ _nbw.style.display=_convs.length?'inline-block':'none'; _nbw.textContent=_convs.length; }
+  subscribeWa();
 
   // pede permissão de notificação e liga o verificador de agendamentos
   if('Notification' in window && Notification.permission==='default'){ try{ Notification.requestPermission(); }catch(_){} }
@@ -863,7 +912,7 @@ async function liberar(id){
 }
 
 // ─── Nav ──────────────────────────────────────────────────────────────────────
-const titles={atendimento:'Atendimento',agente:'Agente de prospecção',leads:'Leads',pipeline:'Pipeline',equipe:'Equipe',config:'Configurações'};
+const titles={atendimento:'Atendimento',whatsapp:'WhatsApp',agente:'Agente de prospecção',leads:'Leads',pipeline:'Pipeline',equipe:'Equipe',config:'Configurações'};
 function nav(v){
   document.querySelectorAll('.view').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
@@ -875,6 +924,7 @@ function nav(v){
   if(v==='equipe')renderTeam();
   if(v==='agente')updateQuota();
   if(v==='atendimento')renderAtendimento();
+  if(v==='whatsapp')openWhatsApp();
 }
 function sc(seg,city,uf){document.getElementById('cmd').value=seg;document.getElementById('city').value=city||'';document.getElementById('uf').value=uf||'';document.getElementById('cmd').focus();}
 
@@ -1426,6 +1476,128 @@ async function snooze(id){
   const when=new Date(Date.now()+10*60000).toISOString();
   await SB.from('leads').update({ follow_up_at:when }).eq('id',id);
   closeAlarm(); await loadLeads();
+}
+
+// ─── Inbox de WhatsApp (Z-API) ─────────────────────────────────────────────────
+function webhookUrl(){ return CFG.url + '/rest/v1/rpc/wa_inbound?apikey=' + CFG.anonKey; }
+
+async function loadWaSettings(){
+  const { data }=await SB.from('wa_settings').select('*').eq('company_id',me.company_id).maybeSingle();
+  waSettings=data||null;
+}
+async function openWhatsApp(){
+  await loadWaSettings();
+  const conectado = waSettings && waSettings.instance && waSettings.token;
+  document.getElementById('wa-setup').style.display = conectado ? 'none' : 'block';
+  document.getElementById('wa-inbox').style.display = conectado ? 'block' : 'none';
+  if(!conectado){
+    // preenche form (admin) e a URL do webhook
+    if(waSettings){
+      document.getElementById('wa-instance').value=waSettings.instance||'';
+      document.getElementById('wa-token').value=waSettings.token||'';
+      document.getElementById('wa-clienttoken').value=waSettings.client_token||'';
+      document.getElementById('wa-number').value=waSettings.wa_number||'';
+    }
+    document.getElementById('wa-webhook-url').value=webhookUrl();
+    if(me.role!=='admin'){ document.getElementById('wa-setup').innerHTML='<div class="info-box">O WhatsApp ainda não foi conectado. Peça ao admin para configurar.</div>'; }
+    return;
+  }
+  await loadWaMessages(); renderConversations();
+}
+function waShowSetup(){
+  document.getElementById('wa-inbox').style.display='none';
+  document.getElementById('wa-setup').style.display='block';
+  if(waSettings){
+    document.getElementById('wa-instance').value=waSettings.instance||'';
+    document.getElementById('wa-token').value=waSettings.token||'';
+    document.getElementById('wa-clienttoken').value=waSettings.client_token||'';
+    document.getElementById('wa-number').value=waSettings.wa_number||'';
+  }
+  document.getElementById('wa-webhook-url').value=webhookUrl();
+}
+async function saveWaSettings(){
+  if(me.role!=='admin'){ return; }
+  const row={ company_id:me.company_id,
+    instance:document.getElementById('wa-instance').value.trim(),
+    token:document.getElementById('wa-token').value.trim(),
+    client_token:document.getElementById('wa-clienttoken').value.trim(),
+    wa_number:document.getElementById('wa-number').value.trim(), updated_at:new Date().toISOString() };
+  if(!row.instance||!row.token){ const m=document.getElementById('wa-msg'); m.className='cfgmsg err'; m.textContent='Preencha ao menos Instance ID e Token.'; m.style.display='block'; return; }
+  const { error }=await SB.from('wa_settings').upsert(row);
+  const m=document.getElementById('wa-msg');
+  if(error){ m.className='cfgmsg err'; m.textContent='Erro: '+error.message; m.style.display='block'; return; }
+  m.className='cfgmsg ok'; m.textContent='Conexão salva! Agora cole a URL do webhook na Z-API.'; m.style.display='block';
+  await openWhatsApp();
+}
+function copyWebhook(){ const el=document.getElementById('wa-webhook-url'); navigator.clipboard?.writeText(el.value); const b=event?.currentTarget; if(b){const o=b.innerHTML;b.innerHTML='<i class="ti ti-check"></i> Copiado!';setTimeout(()=>b.innerHTML=o,1200);} }
+
+async function loadWaMessages(){
+  const { data }=await SB.from('wa_messages').select('*').eq('company_id',me.company_id).order('created_at',{ascending:true}).limit(2000);
+  waMessages=data||[];
+}
+function waConversations(){
+  const map={};
+  waMessages.forEach(mm=>{
+    const k=mm.wa_phone;
+    if(!map[k]) map[k]={ phone:k, name:mm.contact_name||k, last:'', last_at:mm.created_at, lead_id:mm.lead_id };
+    map[k].name=mm.contact_name||map[k].name; map[k].last=mm.body||''; map[k].last_at=mm.created_at; map[k].lead_id=mm.lead_id||map[k].lead_id;
+  });
+  return Object.values(map).sort((a,b)=> new Date(b.last_at)-new Date(a.last_at));
+}
+function renderConversations(){
+  const box=document.getElementById('wa-convlist'); if(!box) return;
+  const convs=waConversations();
+  document.getElementById('nb-wa').style.display=convs.length?'inline-block':'none';
+  document.getElementById('nb-wa').textContent=convs.length;
+  if(!convs.length){ box.innerHTML='<div class="empty" style="padding:24px"><p>Nenhuma conversa ainda.</p></div>'; return; }
+  box.innerHTML=convs.map(c=>`<div onclick="openConversation('${c.phone}')" style="padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;${c.phone===waActivePhone?'background:var(--abg)':''}">
+    <div style="font-weight:600;font-size:13px;display:flex;justify-content:space-between"><span>${esc(c.name)}</span><span style="font-size:10px;color:var(--t3)">${fmtFollow(c.last_at)}</span></div>
+    <div style="font-size:12px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.last)}</div>
+  </div>`).join('');
+}
+function openConversation(phone){
+  waActivePhone=phone;
+  renderConversations();
+  const conv=waConversations().find(c=>c.phone===phone);
+  document.getElementById('wa-thread-head').innerHTML=`${esc(conv?.name||phone)} <span style="font-size:11px;color:var(--t3)">· ${esc(phone)}</span> ${conv?.lead_id?`<button class="btn small" style="float:right" onclick="om('${conv.lead_id}')"><i class="ti ti-eye"></i> Ver lead</button>`:''}`;
+  const thread=document.getElementById('wa-thread');
+  const msgs=waMessages.filter(m=>m.wa_phone===phone);
+  thread.innerHTML=msgs.map(m=>{
+    const out=m.direction==='out';
+    return `<div style="align-self:${out?'flex-end':'flex-start'};max-width:75%;background:${out?'#dcf8c6':'#fff'};border:1px solid var(--border);border-radius:10px;padding:8px 11px;font-size:13px">
+      ${esc(m.body)}<div style="font-size:9px;color:var(--t3);text-align:right;margin-top:3px">${fmtFollow(m.created_at)}</div></div>`;
+  }).join('');
+  document.getElementById('wa-composer').style.display='flex';
+  thread.scrollTop=thread.scrollHeight;
+}
+async function sendWa(){
+  const input=document.getElementById('wa-input'); const text=input.value.trim();
+  if(!text||!waActivePhone||!waSettings) return;
+  input.value='';
+  // envia via Z-API direto
+  try{
+    const url=`https://api.z-api.io/instances/${waSettings.instance}/token/${waSettings.token}/send-text`;
+    const r=await fetch(url,{ method:'POST', headers:{'Content-Type':'application/json','Client-Token':waSettings.client_token||''},
+      body:JSON.stringify({ phone:waActivePhone, message:text }) });
+    if(!r.ok){ const e=await r.text(); alert('Z-API erro: '+e); }
+  }catch(e){ alert('Falha ao enviar: '+e.message); }
+  // registra no banco (aparece na hora + pros outros via realtime)
+  const conv=waConversations().find(c=>c.phone===waActivePhone);
+  await SB.from('wa_messages').insert({ company_id:me.company_id, lead_id:conv?.lead_id||null, wa_phone:waActivePhone, contact_name:conv?.name||waActivePhone, direction:'out', body:text, sent_by:me.id });
+  await loadWaMessages(); openConversation(waActivePhone);
+}
+function subscribeWa(){
+  SB.channel('wa-'+me.company_id)
+    .on('postgres_changes',{event:'*',schema:'public',table:'wa_messages'}, async ()=>{
+      await loadWaMessages();
+      if(document.getElementById('v-whatsapp').classList.contains('active')){
+        renderConversations();
+        if(waActivePhone) openConversation(waActivePhone);
+      } else {
+        const convs=waConversations();
+        const nb=document.getElementById('nb-wa'); nb.style.display=convs.length?'inline-block':'none'; nb.textContent=convs.length;
+      }
+    }).subscribe();
 }
 
 // ─── Exportar ─────────────────────────────────────────────────────────────────
