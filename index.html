@@ -1691,11 +1691,10 @@ function toggleScriptEdit(){
   document.getElementById('script-view').style.display = scriptEditing?'none':'block';
   document.getElementById('script-editor').style.display = scriptEditing?'block':'none';
   document.getElementById('script-edit-btn').innerHTML = scriptEditing?'<i class="ti ti-eye"></i> Ver':'<i class="ti ti-edit"></i> Editar';
-  if(scriptEditing) renderScriptEditor(); else renderScriptView();
+  if(scriptEditing){ scriptDraft = JSON.parse(JSON.stringify(currentScript())); renderScriptEditor(); } else renderScriptView();
 }
 let scriptDraft=[];
 function renderScriptEditor(){
-  scriptDraft = JSON.parse(JSON.stringify(currentScript()));
   const box=document.getElementById('script-editor');
   const rows=scriptDraft.map((s,i)=>`
     <div class="cfgcard" style="margin-bottom:10px">
@@ -1706,7 +1705,7 @@ function renderScriptEditor(){
   box.innerHTML = rows + `
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
       <button class="btn" onclick="addScriptSection()"><i class="ti ti-plus"></i> Adicionar passo</button>
-      ${!scriptDraft.length?`<button class="btn" onclick="loadScriptTemplate()"><i class="ti ti-sparkles"></i> Carregar modelo pronto</button>`:''}
+      <button class="btn" onclick="loadScriptTemplate()"><i class="ti ti-sparkles"></i> Carregar modelo pronto</button>
       <button class="btn btn-primary" onclick="saveScript()"><i class="ti ti-device-floppy"></i> Salvar script</button>
     </div>
     <div class="cfgmsg" id="script-msg"></div>`;
