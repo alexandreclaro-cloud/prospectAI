@@ -190,6 +190,7 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
   <span class="nav-sec">Atendimento</span>
   <div class="nav-item" data-nav="atendimento" onclick="nav('atendimento')"><i class="ti ti-headset"></i> Atendimento <span class="nbadge" id="nb-at" style="display:none">0</span></div>
   <div class="nav-item" data-nav="whatsapp" onclick="nav('whatsapp')"><i class="ti ti-brand-whatsapp"></i> WhatsApp <span class="nbadge" id="nb-wa" style="display:none;background:var(--green)">0</span></div>
+  <div class="nav-item" data-nav="script" onclick="nav('script')"><i class="ti ti-script"></i> Script de vendas</div>
   <span class="nav-sec">Prospecção</span>
   <div class="nav-item active" data-nav="agente" onclick="nav('agente')"><i class="ti ti-robot"></i> Agente IA</div>
   <div class="nav-item" data-nav="leads" onclick="nav('leads')"><i class="ti ti-users"></i> Leads <span class="nbadge" id="nb">0</span></div>
@@ -351,6 +352,18 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- SCRIPT DE VENDAS -->
+    <div class="view" id="v-script">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <div><h2 style="font-size:16px">Script de vendas</h2><div class="sub" style="margin:0">Siga os passos enquanto fala com o cliente.</div></div>
+        <div id="script-adminbar" style="display:none;gap:8px">
+          <button class="btn" id="script-edit-btn" onclick="toggleScriptEdit()"><i class="ti ti-edit"></i> Editar</button>
+        </div>
+      </div>
+      <div id="script-view"></div>
+      <div id="script-editor" style="display:none"></div>
     </div>
 
     <!-- LEADS -->
@@ -707,7 +720,7 @@ async function boot(){
 }
 
 async function loadCompany(){
-  const { data }=await SB.from('companies').select('name,join_code').eq('id',me.company_id).maybeSingle();
+  const { data }=await SB.from('companies').select('*').eq('id',me.company_id).maybeSingle();
   company=data||null;
   if(company){
     document.getElementById('companyName').textContent=company.name;
@@ -912,7 +925,7 @@ async function liberar(id){
 }
 
 // ─── Nav ──────────────────────────────────────────────────────────────────────
-const titles={atendimento:'Atendimento',whatsapp:'WhatsApp',agente:'Agente de prospecção',leads:'Leads',pipeline:'Pipeline',equipe:'Equipe',config:'Configurações'};
+const titles={atendimento:'Atendimento',whatsapp:'WhatsApp',script:'Script de vendas',agente:'Agente de prospecção',leads:'Leads',pipeline:'Pipeline',equipe:'Equipe',config:'Configurações'};
 function nav(v){
   document.querySelectorAll('.view').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
@@ -925,6 +938,7 @@ function nav(v){
   if(v==='agente')updateQuota();
   if(v==='atendimento')renderAtendimento();
   if(v==='whatsapp')openWhatsApp();
+  if(v==='script')openScript();
 }
 function sc(seg,city,uf){document.getElementById('cmd').value=seg;document.getElementById('city').value=city||'';document.getElementById('uf').value=uf||'';document.getElementById('cmd').focus();}
 
@@ -1598,6 +1612,83 @@ function subscribeWa(){
         const nb=document.getElementById('nb-wa'); nb.style.display=convs.length?'inline-block':'none'; nb.textContent=convs.length;
       }
     }).subscribe();
+}
+
+// ─── Script de vendas (roteiro da empresa) ─────────────────────────────────────
+let scriptEditing=false;
+const DEFAULT_SCRIPT=[
+  {title:'1. Abertura (quebra-gelo)', body:'Oi [NOME], tudo bem? Aqui é o(a) [SEU NOME], da [EMPRESA]. Vi que você se interessou pela gente — posso te explicar rapidinho como funciona?\n\nMe conta: o que te fez procurar a gente agora?'},
+  {title:'2. Descoberta (entender a dor)', body:'Perguntas pra fazer:\n• Como você atrai cliente hoje?\n• O que mais te incomoda nisso?\n• Já tentou algo parecido antes? O que aconteceu?\n• Quanto vale pra você resolver isso?\n\n(Escuta mais do que fala. Anota tudo nas Observações do lead.)'},
+  {title:'3. Apresentação da solução', body:'Pelo que você me contou, o que resolve o seu caso é [SOLUÇÃO]. Na prática funciona assim: [3 passos simples].\n\nO resultado que você passa a ter é [TRANSFORMAÇÃO / benefício principal].'},
+  {title:'4. Prova / autoridade', body:'A gente já ajudou [X clientes / cases]. Um exemplo parecido com o seu: [caso rápido + resultado].\n\n(Mostra print, depoimento ou número se tiver.)'},
+  {title:'5. Oferta (setup + mensalidade)', body:'O investimento é [valor de setup] pra começar e [mensalidade] por mês.\n\nNesse valor entra: [o que está incluído]. Sem fidelidade / com garantia de [X].'},
+  {title:'6. Objeções comuns', body:'“Está caro” → Comparado a quê? Quanto te custa continuar do jeito que está? / dá pra parcelar.\n“Não tenho tempo” → A gente faz o trabalho pesado pra você; leva [X min] pra começar.\n“Vou pensar” → Claro! O que exatamente ficou de dúvida? / posso te garantir a condição de hoje até [data].'},
+  {title:'7. Fechamento', body:'Faz sentido pra você? Então bora começar: eu te mando o link/contrato agora e a gente já ativa.\n\n(Define o próximo passo com data. Marca o Agendamento no lead.)'}
+];
+function currentScript(){ const s=company&&company.sales_script; return Array.isArray(s)?s:[]; }
+function openScript(){
+  document.getElementById('script-adminbar').style.display = me.role==='admin' ? 'flex' : 'none';
+  scriptEditing=false;
+  document.getElementById('script-editor').style.display='none';
+  document.getElementById('script-view').style.display='block';
+  const btn=document.getElementById('script-edit-btn'); if(btn) btn.innerHTML='<i class="ti ti-edit"></i> Editar';
+  renderScriptView();
+}
+function renderScriptView(){
+  const box=document.getElementById('script-view');
+  const sc=currentScript();
+  if(!sc.length){
+    box.innerHTML = me.role==='admin'
+      ? `<div class="info-box">Nenhum script ainda. Clique em <strong>Editar</strong> e depois em <strong>"Carregar modelo pronto"</strong> pra começar rápido.</div>`
+      : `<div class="info-box">O script de vendas ainda não foi cadastrado. Peça ao seu gestor.</div>`;
+    return;
+  }
+  box.innerHTML = sc.map((s,i)=>`
+    <div class="cfgcard" style="margin-bottom:12px">
+      <div style="font-weight:700;font-size:15px;color:var(--accent);margin-bottom:8px">${esc(s.title)}</div>
+      <div style="font-size:14px;line-height:1.6;white-space:pre-wrap">${esc(s.body)}</div>
+    </div>`).join('');
+}
+function toggleScriptEdit(){
+  if(me.role!=='admin') return;
+  scriptEditing=!scriptEditing;
+  document.getElementById('script-view').style.display = scriptEditing?'none':'block';
+  document.getElementById('script-editor').style.display = scriptEditing?'block':'none';
+  document.getElementById('script-edit-btn').innerHTML = scriptEditing?'<i class="ti ti-eye"></i> Ver':'<i class="ti ti-edit"></i> Editar';
+  if(scriptEditing) renderScriptEditor(); else renderScriptView();
+}
+let scriptDraft=[];
+function renderScriptEditor(){
+  scriptDraft = JSON.parse(JSON.stringify(currentScript()));
+  const box=document.getElementById('script-editor');
+  const rows=scriptDraft.map((s,i)=>`
+    <div class="cfgcard" style="margin-bottom:10px">
+      <input value="${esc(s.title)}" oninput="scriptDraft[${i}].title=this.value" placeholder="Título do passo" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);font-weight:600;margin-bottom:6px"/>
+      <textarea oninput="scriptDraft[${i}].body=this.value" rows="4" placeholder="Texto do passo" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;resize:vertical;font-family:inherit">${esc(s.body)}</textarea>
+      <button class="btn small" style="margin-top:6px;color:var(--red)" onclick="removeScriptSection(${i})"><i class="ti ti-trash"></i> Remover passo</button>
+    </div>`).join('');
+  box.innerHTML = rows + `
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+      <button class="btn" onclick="addScriptSection()"><i class="ti ti-plus"></i> Adicionar passo</button>
+      ${!scriptDraft.length?`<button class="btn" onclick="loadScriptTemplate()"><i class="ti ti-sparkles"></i> Carregar modelo pronto</button>`:''}
+      <button class="btn btn-primary" onclick="saveScript()"><i class="ti ti-device-floppy"></i> Salvar script</button>
+    </div>
+    <div class="cfgmsg" id="script-msg"></div>`;
+}
+function addScriptSection(){ scriptDraft.push({title:'Novo passo',body:''}); renderScriptEditor(); }
+function removeScriptSection(i){ scriptDraft.splice(i,1); renderScriptEditor(); }
+function loadScriptTemplate(){ scriptDraft = JSON.parse(JSON.stringify(DEFAULT_SCRIPT)); renderScriptEditor(); }
+async function saveScript(){
+  if(me.role!=='admin') return;
+  const { error }=await SB.from('companies').update({ sales_script:scriptDraft }).eq('id',me.company_id);
+  const m=document.getElementById('script-msg');
+  if(error){ if(m){m.className='cfgmsg err';m.textContent='Erro: '+error.message;m.style.display='block';} return; }
+  company.sales_script=JSON.parse(JSON.stringify(scriptDraft));
+  scriptEditing=false;
+  document.getElementById('script-editor').style.display='none';
+  document.getElementById('script-view').style.display='block';
+  document.getElementById('script-edit-btn').innerHTML='<i class="ti ti-edit"></i> Editar';
+  renderScriptView();
 }
 
 // ─── Exportar ─────────────────────────────────────────────────────────────────
