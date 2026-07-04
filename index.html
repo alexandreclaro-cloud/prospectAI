@@ -120,7 +120,11 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
 .aok{background:var(--gbg);color:var(--green)}.apend{background:var(--ambg);color:var(--amber)}
 .modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center;padding:16px}
 .modal-ov.open{display:flex}
-.modal{background:var(--surface);border-radius:14px;border:1px solid var(--border);padding:20px;width:100%;max-width:480px;max-height:85vh;overflow-y:auto}
+.modal{background:var(--surface);border-radius:14px;border:1px solid var(--border);padding:24px;width:100%;max-width:880px;max-height:92vh;overflow-y:auto}
+.mcols{display:flex;gap:24px;align-items:flex-start}
+.mcol{flex:1;min-width:0}
+@media(max-width:720px){.mcols{flex-direction:column;gap:10px}}
+.modal .mval{max-width:none}
 .mtitle{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;gap:10px}
 .mtitle h3{font-size:16px;font-weight:700}
 .msec{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px}
@@ -1372,8 +1376,7 @@ function om(id,fr=false){
   const inCrm=!!leads.find(x=>x.id===id);
   const s = inCrm ? lockState(l) : null;
   const row=(ic,lb,val,cls='')=>`<div class="mrow"><span class="mlabel"><i class="ti ti-${ic}"></i> ${lb}</span><span class="mval ${cls||(!val?'none':'found')}">${val||'Não encontrado'}</span></div>`;
-  document.getElementById('mbody').innerHTML=`
-    <div class="mtitle"><h3>${esc(l.name)} ${inCrm?lockChip(l):''}</h3><button class="ibtn" onclick="cm()" aria-label="Fechar"><i class="ti ti-x"></i></button></div>
+  const infoCol=`
     ${row('map-pin','Endereço',esc(l.address),'')}
     ${l.rating?row('star','Avaliação',l.rating+' ★ ('+l.totalRatings+' avaliações)',''):'' }
     <div class="msec">Contatos</div>
@@ -1383,11 +1386,11 @@ function om(id,fr=false){
     ${row('world','Site',l.site?`<a href="${l.site.startsWith('http')?l.site:'https://'+l.site}" target="_blank">${esc(l.site)}</a>`:null,'')}
     ${row('brand-instagram','Instagram',l.instagram?`<a href="https://instagram.com/${(l.instagram||'').replace('@','')}" target="_blank">${esc(l.instagram)}</a>`:null,'')}
     ${row('brand-linkedin','LinkedIn',l.linkedin?`<a href="https://${esc(l.linkedin)}" target="_blank">${esc(l.linkedin)}</a>`:null,'')}
-    ${l.decisor?`<div class="msec">Decisor</div>${row('user','Nome',esc(l.decisor),'')}${row('briefcase','Cargo',esc(l.decisorCargo),'')}`:'' }
-    ${inCrm?`
-      <div class="msec">Observações & Agendamento</div>
+    ${l.decisor?`<div class="msec">Decisor</div>${row('user','Nome',esc(l.decisor),'')}${row('briefcase','Cargo',esc(l.decisorCargo),'')}`:'' }`;
+  const workCol=inCrm?`
+      <div class="msec" style="margin-top:0">Observações & Agendamento</div>
       <label style="font-size:12px;color:var(--t2);display:block;margin-bottom:4px">O que combinei / anotações da conversa</label>
-      <textarea id="lead-notes" rows="3" placeholder="Ex: Liguei dia 03/07, falei com a Ana, retornar semana que vem com proposta..." style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;resize:vertical;font-family:inherit">${esc(l.notes||'')}</textarea>
+      <textarea id="lead-notes" rows="5" placeholder="Ex: Liguei dia 03/07, falei com a Ana, retornar semana que vem com proposta..." style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;resize:vertical;font-family:inherit">${esc(l.notes||'')}</textarea>
       <label style="font-size:12px;color:var(--t2);display:block;margin:10px 0 4px">Agendar retorno (data e hora)</label>
       <input id="lead-followup" type="datetime-local" value="${toLocalInput(l.follow_up_at)}" style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px"/>
       <div class="msec">Valor do negócio</div>
@@ -1398,8 +1401,13 @@ function om(id,fr=false){
           <input id="lead-mrr" type="number" min="0" step="1" value="${l.deal_mrr||''}" placeholder="0" style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px"/></div>
       </div>
       <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="saveLeadDetails('${l.id}')"><i class="ti ti-device-floppy"></i> Salvar</button>
-      ${leadFollowupBlock(l)}
-    `:''}
+      ${leadFollowupBlock(l)}`:'';
+  document.getElementById('mbody').innerHTML=`
+    <div class="mtitle"><h3>${esc(l.name)} ${inCrm?lockChip(l):''}</h3><button class="ibtn" onclick="cm()" aria-label="Fechar"><i class="ti ti-x"></i></button></div>
+    <div class="mcols">
+      <div class="mcol">${infoCol}</div>
+      ${inCrm?`<div class="mcol">${workCol}</div>`:''}
+    </div>
     <div class="mactions">
       ${!inCrm?`<button class="btn btn-green" onclick="addOne('${l.id}');nav('leads');cm()"><i class="ti ti-plus"></i> Add CRM</button>`:''}
       ${inCrm&&s.canManage&&!s.by?`<button class="btn btn-green" onclick="pegar('${l.id}');cm()"><i class="ti ti-hand-click"></i> Pegar lead</button>`:''}
