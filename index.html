@@ -464,6 +464,12 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
       </div>
       <div class="warn-box"><i class="ti ti-alert-triangle" style="font-size:16px;flex-shrink:0;margin-top:1px"></i>
         <span>Para o Places API funcionar no browser, libere o domínio na chave Google: Restrições da chave → Referers HTTP → adicione o domínio da Vercel (ex: <code style="background:#fef3c7;padding:1px 5px;border-radius:4px">*.vercel.app/*</code>) e <code style="background:#fef3c7;padding:1px 5px;border-radius:4px">*localhost*</code></span></div>
+
+      <div class="cfgcard" id="tpl-card" style="display:none">
+        <h2>Modelos de mensagem (follow-up)</h2>
+        <div class="sub">Textos prontos pra cadência de WhatsApp. Use <code>{NOME}</code> e <code>{EMPRESA}</code>.</div>
+        <div id="tpl-box"></div>
+      </div>
     </div>
 
   </div>
@@ -500,6 +506,7 @@ let me=null;              // { id, name, email, role, company_id }
 let pendingJoinCode=null; // código de convite vindo do link (#join=...)
 const DAILY_SEARCH_LIMIT=20; // buscas/dia por vendedor (admin sem limite)
 let waSettings=null, waMessages=[], waActivePhone=null; // inbox WhatsApp
+let scheduledMsgs=[]; // cadência de follow-up (scheduled_messages)
 let usersById={};         // uuid -> { name, email, role }
 let company=null;         // { name, join_code }
 let SB=null;
@@ -702,6 +709,10 @@ async function boot(){
   await loadLeads();
   subscribe();
   updateQuota();
+
+  // Cadência de follow-up
+  await loadScheduledMessages();
+  SB.channel('sched-'+me.company_id).on('postgres_changes',{event:'*',schema:'public',table:'scheduled_messages'}, ()=>loadScheduledMessages()).subscribe();
 
   // WhatsApp: carrega config, mensagens e liga o tempo real
   await loadWaSettings();
@@ -939,6 +950,7 @@ function nav(v){
   if(v==='atendimento')renderAtendimento();
   if(v==='whatsapp')openWhatsApp();
   if(v==='script')openScript();
+  if(v==='config')renderMsgTemplates();
 }
 function sc(seg,city,uf){document.getElementById('cmd').value=seg;document.getElementById('city').value=city||'';document.getElementById('uf').value=uf||'';document.getElementById('cmd').focus();}
 
@@ -1380,6 +1392,7 @@ function om(id,fr=false){
           <input id="lead-mrr" type="number" min="0" step="1" value="${l.deal_mrr||''}" placeholder="0" style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px"/></div>
       </div>
       <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="saveLeadDetails('${l.id}')"><i class="ti ti-device-floppy"></i> Salvar</button>
+      ${leadFollowupBlock(l)}
     `:''}
     <div class="mactions">
       ${!inCrm?`<button class="btn btn-green" onclick="addOne('${l.id}');nav('leads');cm()"><i class="ti ti-plus"></i> Add CRM</button>`:''}
@@ -1451,18 +1464,17 @@ function dueLeads(){
   const now=Date.now();
   return leads.filter(l=> l.follow_up_at && new Date(l.follow_up_at).getTime()<=now && !isAcked(l));
 }
+function msgAckObj(m){ return {id:'msg'+m.id, follow_up_at:m.send_at}; }
 function checkFollowUps(){
   if(alarmOpen) return;
-  const due=dueLeads();
-  if(due.length) showAlarm(due);
+  const dl=dueLeads(), dm=dueMsgs();
+  if(dl.length||dm.length){ alarmOpen=true; renderAlarmBody(dl,dm); document.getElementById('alarm-ov').classList.add('open'); startAlarmSound(); notifyAlarm(dl,dm); document.title='⏰ FOLLOW-UP! — ProspectAI'; }
 }
-function showAlarm(due){
-  alarmOpen=true;
-  document.getElementById('alarm-body').innerHTML = due.map(l=>`
+function renderAlarmBody(dl,dm){
+  const leadItems=dl.map(l=>`
     <div class="alarm-item">
-      <div class="an">${esc(l.name)}</div>
-      <div class="at"><i class="ti ti-clock"></i> Agendado para ${fmtFollow(l.follow_up_at)}</div>
-      ${l.phone?`<div style="font-size:12px;color:var(--t2)">${esc(l.phone)}</div>`:''}
+      <div class="an"><i class="ti ti-clock"></i> ${esc(l.name)}</div>
+      <div class="at">Retorno agendado — ${fmtFollow(l.follow_up_at)}</div>
       ${l.notes?`<div class="ao">📝 ${esc(l.notes)}</div>`:''}
       <div class="arow">
         ${l.whatsapp?`<button class="btn small btn-green" onclick="owpp('${l.whatsapp}')"><i class="ti ti-brand-whatsapp"></i> WhatsApp</button>`:''}
@@ -1470,26 +1482,44 @@ function showAlarm(due){
         <button class="btn small" onclick="snooze('${l.id}')"><i class="ti ti-alarm-snooze"></i> Adiar 10 min</button>
       </div>
     </div>`).join('');
-  document.getElementById('alarm-ov').classList.add('open');
-  startAlarmSound();
-  // notificação do sistema (aparece mesmo com a aba em 2º plano)
-  if('Notification' in window && Notification.permission==='granted'){
-    due.forEach(l=>{ try{ new Notification('⏰ Retornar: '+l.name, { body:(l.notes||'Hora do agendamento') }); }catch(_){} });
-  }
-  document.title='⏰ AGENDAMENTO! — ProspectAI';
+  const msgItems=dm.map(m=>`
+    <div class="alarm-item" style="border-left-color:var(--green)">
+      <div class="an"><i class="ti ti-brand-whatsapp" style="color:var(--green)"></i> ${esc(m.contact_name||m.wa_phone)}</div>
+      <div class="at" style="color:var(--green)">Mensagem de follow-up — ${fmtFollow(m.send_at)}</div>
+      <div class="ao">💬 ${esc(m.body)}</div>
+      <div class="arow">
+        <button class="btn small btn-green" onclick="sendScheduledNow('${m.id}')"><i class="ti ti-send"></i> Enviar no WhatsApp</button>
+        <button class="btn small" onclick="snoozeMsg('${m.id}')"><i class="ti ti-alarm-snooze"></i> Adiar 10 min</button>
+        <button class="btn small" onclick="ackMsg('${m.id}')">Depois</button>
+      </div>
+    </div>`).join('');
+  document.getElementById('alarm-body').innerHTML = msgItems + leadItems;
 }
+function notifyAlarm(dl,dm){
+  if(!('Notification' in window) || Notification.permission!=='granted') return;
+  dl.forEach(l=>{ try{ new Notification('⏰ Retornar: '+l.name,{body:l.notes||'Hora do agendamento'}); }catch(_){} });
+  dm.forEach(m=>{ try{ new Notification('💬 Follow-up: '+(m.contact_name||m.wa_phone),{body:m.body}); }catch(_){} });
+}
+function afterAlarmAction(){ const dl=dueLeads(), dm=dueMsgs(); if(!dl.length&&!dm.length){ closeAlarm(); return; } renderAlarmBody(dl,dm); }
 function closeAlarm(){
   dueLeads().forEach(ackLead);
+  dueMsgs().forEach(m=>ackLead(msgAckObj(m)));
   stopAlarmSound();
   document.getElementById('alarm-ov').classList.remove('open');
   alarmOpen=false;
   document.title='ProspectAI';
 }
 function alarmOpenLead(id){ const l=leads.find(x=>x.id===id); if(l) ackLead(l); closeAlarm(); om(id); }
+function ackMsg(id){ const m=scheduledMsgs.find(x=>x.id===id); if(m) ackLead(msgAckObj(m)); afterAlarmAction(); }
 async function snooze(id){
   const when=new Date(Date.now()+10*60000).toISOString();
   await SB.from('leads').update({ follow_up_at:when }).eq('id',id);
   closeAlarm(); await loadLeads();
+}
+async function snoozeMsg(id){
+  const when=new Date(Date.now()+10*60000).toISOString();
+  await SB.from('scheduled_messages').update({ send_at:when }).eq('id',id);
+  await loadScheduledMessages(); afterAlarmAction();
 }
 
 // ─── Inbox de WhatsApp (Z-API) ─────────────────────────────────────────────────
@@ -1689,6 +1719,107 @@ async function saveScript(){
   document.getElementById('script-view').style.display='block';
   document.getElementById('script-edit-btn').innerHTML='<i class="ti ti-edit"></i> Editar';
   renderScriptView();
+}
+
+// ─── Cadência de follow-up por WhatsApp ────────────────────────────────────────
+async function loadScheduledMessages(){
+  const { data }=await SB.from('scheduled_messages').select('*').eq('company_id',me.company_id).eq('status','pending').order('send_at',{ascending:true}).limit(1000);
+  scheduledMsgs=data||[];
+}
+function msgTemplates(){ const t=company&&company.msg_templates; return Array.isArray(t)?t:[]; }
+function fillTpl(text,l){ return (text||'').replace(/\{NOME\}/gi, (l&&l.name?String(l.name).split(' ')[0]:'')).replace(/\{EMPRESA\}/gi, company?.name||''); }
+
+// bloco de follow-up dentro do modal do lead
+function leadFollowupBlock(l){
+  const tpls=msgTemplates();
+  const mine=scheduledMsgs.filter(m=>m.lead_id===l.id);
+  const tplOpts=tpls.map((t,i)=>`<option value="${i}">${esc(t.name)}</option>`).join('');
+  const list=mine.length? mine.map(m=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <div><span style="color:var(--purple);font-weight:600"><i class="ti ti-clock"></i> ${fmtFollow(m.send_at)}</span> ${m.auto?'<span class="lockchip" style="background:var(--gbg);color:var(--green)">auto</span>':''}<div style="color:var(--t2)">${esc((m.body||'').slice(0,70))}</div></div>
+      <button class="ibtn r" title="Cancelar" onclick="cancelScheduled('${m.id}')"><i class="ti ti-x"></i></button></div>`).join('') : '<div class="muted" style="font-size:12px;color:var(--t3)">Nenhuma mensagem agendada.</div>';
+  return `
+    <div class="msec">Follow-up por WhatsApp (cadência)</div>
+    ${tpls.length?`<select id="fu-tpl" onchange="applyTpl(this)" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;margin-bottom:6px"><option value="">— usar um modelo —</option>${tplOpts}</select>`:''}
+    <textarea id="fu-body" rows="2" placeholder="Mensagem do follow-up (use {NOME})" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;resize:vertical;font-family:inherit"></textarea>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
+      <input id="fu-when" type="datetime-local" style="flex:1;min-width:170px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);font-size:13px"/>
+      <label style="font-size:12px;color:var(--t2);display:flex;align-items:center;gap:4px;margin:0"><input type="checkbox" id="fu-auto" style="width:auto"/> enviar automático (Z-API)</label>
+      <button class="btn small btn-primary" onclick="scheduleMessage('${l.id}')"><i class="ti ti-calendar-plus"></i> Agendar</button>
+    </div>
+    <div style="margin-top:8px"><button class="btn small" onclick="startCadence('${l.id}')"><i class="ti ti-stack-2"></i> Cadência rápida (D+1, D+3, D+7)</button></div>
+    <div style="margin-top:10px">${list}</div>`;
+}
+function applyTpl(sel){ const t=msgTemplates()[+sel.value]; if(t){ document.getElementById('fu-body').value=t.body; } }
+async function scheduleMessage(leadId){
+  const l=leads.find(x=>x.id===leadId); if(!l) return;
+  const body=document.getElementById('fu-body').value.trim();
+  const whenRaw=document.getElementById('fu-when').value;
+  const auto=document.getElementById('fu-auto').checked;
+  if(!body||!whenRaw){ alert('Escreva a mensagem e escolha data/hora.'); return; }
+  const phone=(l.whatsapp||l.phone||'').replace(/\D/g,'');
+  if(!phone){ alert('Este lead não tem telefone.'); return; }
+  const { error }=await SB.from('scheduled_messages').insert({ company_id:me.company_id, lead_id:leadId, wa_phone:phone, contact_name:l.name, body, send_at:new Date(whenRaw).toISOString(), auto, created_by:me.id });
+  if(error){ alert('Erro: '+error.message); return; }
+  await loadScheduledMessages(); om(leadId);
+}
+async function startCadence(leadId){
+  const l=leads.find(x=>x.id===leadId); if(!l) return;
+  const phone=(l.whatsapp||l.phone||'').replace(/\D/g,'');
+  if(!phone){ alert('Este lead não tem telefone.'); return; }
+  const tpls=msgTemplates();
+  const days=[1,3,7]; const rows=days.map((d,i)=>{
+    const when=new Date(); when.setDate(when.getDate()+d); when.setHours(10,0,0,0);
+    const body=(tpls[i]?tpls[i].body:'Oi {NOME}, passando pra saber se você teve a chance de pensar na nossa conversa. Posso te ajudar em algo?');
+    return { company_id:me.company_id, lead_id:leadId, wa_phone:phone, contact_name:l.name, body, send_at:when.toISOString(), auto:false, created_by:me.id };
+  });
+  const { error }=await SB.from('scheduled_messages').insert(rows);
+  if(error){ alert('Erro: '+error.message); return; }
+  await loadScheduledMessages(); om(leadId);
+}
+async function cancelScheduled(id){
+  await SB.from('scheduled_messages').update({ status:'canceled' }).eq('id',id);
+  await loadScheduledMessages();
+  if(document.getElementById('mov').classList.contains('open')){ const open=leads.find(x=>scheduledMsgs.some(m=>m.lead_id===x.id)); }
+}
+function dueMsgs(){
+  const now=Date.now();
+  return scheduledMsgs.filter(m=>m.status==='pending' && !m.auto && new Date(m.send_at).getTime()<=now && !isAcked({id:'msg'+m.id, follow_up_at:m.send_at}));
+}
+async function sendScheduledNow(id){
+  const m=scheduledMsgs.find(x=>x.id===id); if(!m) return;
+  const l=leads.find(x=>x.id===m.lead_id);
+  const txt=fillTpl(m.body,l);
+  window.open('https://wa.me/55'+m.wa_phone.replace(/\D/g,'')+'?text='+encodeURIComponent(txt),'_blank');
+  await SB.from('scheduled_messages').update({ status:'sent', sent_at:new Date().toISOString() }).eq('id',id);
+  ackLead(msgAckObj(m));
+  await loadScheduledMessages();
+  if(alarmOpen) afterAlarmAction();
+}
+
+// gestão de modelos de mensagem (admin, na aba Configurações)
+let tplEditing=false, tplDraft=[];
+function renderMsgTemplates(){
+  const box=document.getElementById('tpl-box'); if(!box) return;
+  document.getElementById('tpl-card').style.display = me.role==='admin' ? 'block':'none';
+  if(!tplEditing){
+    const t=msgTemplates();
+    box.innerHTML = (t.length? t.map(x=>`<div style="padding:8px 0;border-bottom:1px solid var(--border)"><strong>${esc(x.name)}</strong><div style="font-size:13px;color:var(--t2);white-space:pre-wrap">${esc(x.body)}</div></div>`).join('') : '<div class="muted" style="color:var(--t3)">Nenhum modelo. Clique em Editar.</div>')
+      + `<button class="btn small" style="margin-top:10px" onclick="editTemplates()"><i class="ti ti-edit"></i> Editar modelos</button>`;
+    return;
+  }
+  const rows=tplDraft.map((x,i)=>`<div class="cfgcard" style="margin-bottom:8px;background:var(--s2)">
+    <input value="${esc(x.name)}" oninput="tplDraft[${i}].name=this.value" placeholder="Nome (ex: 1º follow-up)" style="width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border);font-weight:600;margin-bottom:6px"/>
+    <textarea oninput="tplDraft[${i}].body=this.value" rows="3" placeholder="Mensagem — use {NOME} e {EMPRESA}" style="width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;font-family:inherit">${esc(x.body)}</textarea>
+    <button class="btn small" style="margin-top:6px;color:var(--red)" onclick="tplDraft.splice(${i},1);renderMsgTemplates()"><i class="ti ti-trash"></i> Remover</button></div>`).join('');
+  box.innerHTML = rows + `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+    <button class="btn small" onclick="tplDraft.push({name:'Novo modelo',body:''});renderMsgTemplates()"><i class="ti ti-plus"></i> Novo modelo</button>
+    <button class="btn small btn-primary" onclick="saveTemplates()"><i class="ti ti-device-floppy"></i> Salvar modelos</button></div>`;
+}
+function editTemplates(){ tplEditing=true; tplDraft=JSON.parse(JSON.stringify(msgTemplates())); if(!tplDraft.length)tplDraft.push({name:'1º follow-up',body:'Oi {NOME}, tudo bem? Passando pra saber se você teve a chance de ver o que conversamos. Posso te ajudar?'}); renderMsgTemplates(); }
+async function saveTemplates(){
+  const { error }=await SB.from('companies').update({ msg_templates:tplDraft }).eq('id',me.company_id);
+  if(error){ alert('Erro: '+error.message); return; }
+  company.msg_templates=JSON.parse(JSON.stringify(tplDraft)); tplEditing=false; renderMsgTemplates();
 }
 
 // ─── Exportar ─────────────────────────────────────────────────────────────────
