@@ -470,6 +470,12 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
         <div class="sub">Textos prontos pra cadência de WhatsApp. Use <code>{NOME}</code> e <code>{EMPRESA}</code>.</div>
         <div id="tpl-box"></div>
       </div>
+
+      <div class="cfgcard" id="cad-card" style="display:none">
+        <h2>Cadência de follow-up (régua de lembretes)</h2>
+        <div class="sub">Defina os passos. Quando o vendedor clicar "Iniciar cadência" num lead, o sistema cria os lembretes nas datas certas pra ele chamar o cliente.</div>
+        <div id="cad-box"></div>
+      </div>
     </div>
 
   </div>
@@ -950,7 +956,7 @@ function nav(v){
   if(v==='atendimento')renderAtendimento();
   if(v==='whatsapp')openWhatsApp();
   if(v==='script')openScript();
-  if(v==='config')renderMsgTemplates();
+  if(v==='config'){ renderMsgTemplates(); renderCadence(); }
 }
 function sc(seg,city,uf){document.getElementById('cmd').value=seg;document.getElementById('city').value=city||'';document.getElementById('uf').value=uf||'';document.getElementById('cmd').focus();}
 
@@ -1746,7 +1752,7 @@ function leadFollowupBlock(l){
       <label style="font-size:12px;color:var(--t2);display:flex;align-items:center;gap:4px;margin:0"><input type="checkbox" id="fu-auto" style="width:auto"/> enviar automático (Z-API)</label>
       <button class="btn small btn-primary" onclick="scheduleMessage('${l.id}')"><i class="ti ti-calendar-plus"></i> Agendar</button>
     </div>
-    <div style="margin-top:8px"><button class="btn small" onclick="startCadence('${l.id}')"><i class="ti ti-stack-2"></i> Cadência rápida (D+1, D+3, D+7)</button></div>
+    <div style="margin-top:8px"><button class="btn small" onclick="startCadence('${l.id}')"><i class="ti ti-stack-2"></i> Iniciar cadência (lembretes automáticos)</button></div>
     <div style="margin-top:10px">${list}</div>`;
 }
 function applyTpl(sel){ const t=msgTemplates()[+sel.value]; if(t){ document.getElementById('fu-body').value=t.body; } }
@@ -1766,11 +1772,12 @@ async function startCadence(leadId){
   const l=leads.find(x=>x.id===leadId); if(!l) return;
   const phone=(l.whatsapp||l.phone||'').replace(/\D/g,'');
   if(!phone){ alert('Este lead não tem telefone.'); return; }
-  const tpls=msgTemplates();
-  const days=[1,3,7]; const rows=days.map((d,i)=>{
-    const when=new Date(); when.setDate(when.getDate()+d); when.setHours(10,0,0,0);
-    const body=(tpls[i]?tpls[i].body:'Oi {NOME}, passando pra saber se você teve a chance de pensar na nossa conversa. Posso te ajudar em algo?');
-    return { company_id:me.company_id, lead_id:leadId, wa_phone:phone, contact_name:l.name, body, send_at:when.toISOString(), auto:false, created_by:me.id };
+  const steps=cadenceSteps();
+  if(!steps.length){ alert('Nenhuma cadência definida ainda. O admin define em Configurações → Cadência de follow-up.'); return; }
+  const rows=steps.map(st=>{
+    const when=new Date(); when.setDate(when.getDate()+(st.dias||0));
+    if((st.dias||0)>0) when.setHours(10,0,0,0); // passos futuros às 10h; "no dia" = agora
+    return { company_id:me.company_id, lead_id:leadId, wa_phone:phone, contact_name:l.name, body:st.texto, send_at:when.toISOString(), auto:false, created_by:me.id };
   });
   const { error }=await SB.from('scheduled_messages').insert(rows);
   if(error){ alert('Erro: '+error.message); return; }
@@ -1820,6 +1827,43 @@ async function saveTemplates(){
   const { error }=await SB.from('companies').update({ msg_templates:tplDraft }).eq('id',me.company_id);
   if(error){ alert('Erro: '+error.message); return; }
   company.msg_templates=JSON.parse(JSON.stringify(tplDraft)); tplEditing=false; renderMsgTemplates();
+}
+
+// gestão da cadência (régua de lembretes) — admin
+let cadEditing=false, cadDraft=[];
+function cadenceSteps(){ const c=company&&company.cadence; return Array.isArray(c)?c:[]; }
+function renderCadence(){
+  const box=document.getElementById('cad-box'); if(!box) return;
+  document.getElementById('cad-card').style.display = me.role==='admin' ? 'block':'none';
+  if(!cadEditing){
+    const c=cadenceSteps();
+    box.innerHTML = (c.length? c.map((x,i)=>`<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span class="badge" style="height:fit-content">${x.dias===0?'No dia':'D+'+x.dias}</span>
+        <div style="font-size:13px">${esc(x.texto)}</div></div>`).join('') : '<div class="muted" style="color:var(--t3)">Nenhuma cadência definida. Clique em Editar.</div>')
+      + `<button class="btn small" style="margin-top:10px" onclick="editCadence()"><i class="ti ti-edit"></i> Editar cadência</button>`;
+    return;
+  }
+  const rows=cadDraft.map((x,i)=>`<div class="cfgcard" style="margin-bottom:8px;background:var(--s2);display:flex;gap:8px;align-items:flex-start">
+      <div style="flex:0 0 90px"><label style="font-size:11px;color:var(--t3)">Dias depois</label>
+        <input type="number" min="0" value="${x.dias}" oninput="cadDraft[${i}].dias=parseInt(this.value)||0" style="width:100%;padding:7px 8px;border-radius:8px;border:1px solid var(--border)"/></div>
+      <div style="flex:1"><label style="font-size:11px;color:var(--t3)">Lembrete / mensagem</label>
+        <input value="${esc(x.texto)}" oninput="cadDraft[${i}].texto=this.value" placeholder="Ex: Ligar pra saber se decidiu" style="width:100%;padding:7px 8px;border-radius:8px;border:1px solid var(--border)"/></div>
+      <button class="btn small" style="margin-top:16px;color:var(--red)" onclick="cadDraft.splice(${i},1);renderCadence()"><i class="ti ti-trash"></i></button>
+    </div>`).join('');
+  box.innerHTML = rows + `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+    <button class="btn small" onclick="cadDraft.push({dias:1,texto:''});renderCadence()"><i class="ti ti-plus"></i> Adicionar passo</button>
+    <button class="btn small btn-primary" onclick="saveCadence()"><i class="ti ti-device-floppy"></i> Salvar cadência</button></div>`;
+}
+function editCadence(){
+  cadEditing=true; cadDraft=JSON.parse(JSON.stringify(cadenceSteps()));
+  if(!cadDraft.length) cadDraft=[{dias:0,texto:'Ligar agora — 1º contato'},{dias:1,texto:'Ligar de novo se não respondeu'},{dias:3,texto:'Mandar WhatsApp com proposta'},{dias:7,texto:'Última tentativa'}];
+  renderCadence();
+}
+async function saveCadence(){
+  const clean=cadDraft.filter(x=>x.texto&&x.texto.trim());
+  const { error }=await SB.from('companies').update({ cadence:clean }).eq('id',me.company_id);
+  if(error){ alert('Erro: '+error.message); return; }
+  company.cadence=JSON.parse(JSON.stringify(clean)); cadEditing=false; renderCadence();
 }
 
 // ─── Exportar ─────────────────────────────────────────────────────────────────
