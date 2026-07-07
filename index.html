@@ -209,6 +209,7 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
   <div class="topbar">
     <h1 id="ptitle">Agente de prospecção</h1>
     <div class="tactions">
+      <button class="btn" id="presenceBtn" onclick="toggleAvailable()" title="Clique para ficar Disponível ou Ausente">Disponível</button>
       <button class="btn" onclick="exportCSV()"><i class="ti ti-download"></i> Exportar CSV</button>
       <button class="btn btn-primary" onclick="nav('agente')"><i class="ti ti-plus"></i> Nova busca</button>
       <div class="userchip" id="userchip" title="Sair" onclick="logout()">
@@ -730,6 +731,7 @@ async function boot(){
   const _convs=waConversations(); const _nbw=document.getElementById('nb-wa');
   if(_nbw){ _nbw.style.display=_convs.length?'inline-block':'none'; _nbw.textContent=_convs.length; }
   subscribeWa();
+  startPresence();
 
   // pede permissão de notificação e liga o verificador de agendamentos
   if('Notification' in window && Notification.permission==='default'){ try{ Notification.requestPermission(); }catch(_){} }
@@ -760,20 +762,47 @@ function copyInviteLink(){
 }
 
 async function loadTeam(){
-  const { data }=await SB.from('profiles').select('id,name,email,role').eq('company_id',me.company_id);
+  const { data }=await SB.from('profiles').select('id,name,email,role,available,last_seen').eq('company_id',me.company_id);
   usersById={}; (data||[]).forEach(p=>usersById[p.id]=p);
   renderTeam();
 }
+function isOnline(p){ return p && p.available!==false && p.last_seen && (Date.now()-new Date(p.last_seen).getTime())<90000; }
 
 function renderTeam(){
   const tb=document.getElementById('teambody'); if(!tb) return;
   const list=Object.values(usersById);
-  tb.innerHTML=list.map(p=>`<tr>
-    <td>${esc(p.name)||'—'} ${p.id===me.id?'<span style="color:var(--t3)">(você)</span>':''}</td>
+  tb.innerHTML=list.map(p=>{
+    const on=isOnline(p);
+    return `<tr>
+    <td><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${on?'var(--green)':'var(--t3)'};margin-right:6px" title="${on?'Online':'Offline'}"></span>${esc(p.name)||'—'} ${p.id===me.id?'<span style="color:var(--t3)">(você)</span>':''}</td>
     <td>${esc(p.email)||'—'}</td>
-    <td><span class="rolebadge" style="${p.role==='vendedor'?'background:var(--abg);color:var(--accent)':''}">${p.role}</span></td>
+    <td><span class="rolebadge" style="${p.role==='vendedor'?'background:var(--abg);color:var(--accent)':''}">${p.role}</span> ${on?'<span class="badge bpronto">online</span>':'<span class="badge" style="color:var(--t3)">offline</span>'}</td>
     <td>${ p.id!==me.id ? `<button class="btn" style="padding:4px 10px;font-size:12px" onclick="toggleRole('${p.id}','${p.role}')">${p.role==='admin'?'Tornar vendedor':'Tornar admin'}</button>` : '' }</td>
-  </tr>`).join('');
+  </tr>`;}).join('');
+}
+
+// ─── Presença (online/disponível) ──────────────────────────────────────────────
+let myAvailable=true, presenceTimer=null;
+async function heartbeat(){
+  try{ await SB.from('profiles').update({ last_seen:new Date().toISOString(), available:myAvailable }).eq('id',me.id); }catch(_){}
+}
+function startPresence(){
+  myAvailable = ls('available')!=='0';
+  heartbeat();
+  if(presenceTimer) clearInterval(presenceTimer);
+  presenceTimer=setInterval(()=>{ if(document.visibilityState==='visible') heartbeat(); }, 30000);
+  renderPresenceBtn();
+}
+async function toggleAvailable(){
+  myAvailable=!myAvailable; ss('available', myAvailable?'1':'0');
+  await heartbeat(); renderPresenceBtn();
+}
+function renderPresenceBtn(){
+  const el=document.getElementById('presenceBtn'); if(!el) return;
+  el.innerHTML = myAvailable
+    ? '<span style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block"></span> Disponível'
+    : '<span style="width:8px;height:8px;border-radius:50%;background:var(--t3);display:inline-block"></span> Ausente';
+  el.style.color = myAvailable?'var(--green)':'var(--t3)';
 }
 
 async function toggleRole(id, cur){
@@ -808,6 +837,7 @@ function leadToRow(l){
     source:'manual', assigned_to:me.id, assigned_at:new Date().toISOString() };
 }
 
+let poolSeen=null; // ids do pool já vistos (pra alertar só nos novos)
 async function loadLeads(){
   const { data, error }=await SB.from('leads').select('*').order('created_at',{ascending:false});
   if(error){ console.error(error); return; }
@@ -815,7 +845,25 @@ async function loadLeads(){
   updateStats();
   const prosp=leads.filter(isProspeccao).length;
   document.getElementById('nb').textContent=prosp;
+  poolAlert();
   rl(); rp(); renderAtendimento();
+}
+function poolLeads(){ return leads.filter(l=>isAtendimento(l) && !l.assigned_to && l.status!=='ganho' && l.status!=='perdido'); }
+function poolAlert(){
+  const pool=poolLeads();
+  const ids=new Set(pool.map(l=>l.id));
+  // badge no menu
+  const nbat=document.getElementById('nb-at'); if(nbat){ nbat.style.display=pool.length?'inline-block':'none'; nbat.textContent=pool.length; }
+  if(poolSeen===null){ poolSeen=ids; return; } // primeira carga: não alerta retroativo
+  const novos=[...ids].filter(id=>!poolSeen.has(id));
+  poolSeen=ids;
+  // toca alarme só se EU estiver online/disponível e tiver lead novo no pool
+  if(novos.length && myAvailable && document.visibilityState==='visible'){
+    ensureAudio(); beep();
+    if('Notification' in window && Notification.permission==='granted'){
+      novos.forEach(id=>{ const l=leads.find(x=>x.id===id); if(l){ try{ new Notification('🔥 Lead novo disponível!',{body:(l.name||'')+' — '+(l.campaign||l.source||'')+' · clique em Pegar'}); }catch(_){} } });
+    }
+  }
 }
 
 // separa os dois mundos: prospecção (outbound) x atendimento (inbound)
@@ -838,7 +886,7 @@ function slaBadge(l){
 }
 function money(v){ return v ? 'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:0}) : ''; }
 
-function captureLink(){ return company ? location.origin + '/captar.html?c=' + company.join_code : ''; }
+function captureLink(){ return company ? location.origin + '/captar.html?c=' + (company.capture_code||company.join_code) : ''; }
 function copyCaptureLink(){
   const el=document.getElementById('at-capturelink'); if(!el) return;
   navigator.clipboard?.writeText(el.value); el.select?.();
@@ -861,8 +909,9 @@ function renderAtendimento(){
   document.getElementById('at-andamento').textContent=andamento;
   document.getElementById('at-sla').textContent=slaEstourado;
   document.getElementById('at-ganhos').textContent=ganhos;
+  const poolN=poolLeads().length;
   const nbat=document.getElementById('nb-at');
-  if(nbat){ nbat.textContent=novos; nbat.style.display=novos?'inline-block':'none'; }
+  if(nbat){ nbat.textContent=poolN; nbat.style.display=poolN?'inline-block':'none'; }
 
   // filtros
   const q=(document.getElementById('at-q')?.value||'').toLowerCase();
@@ -873,17 +922,22 @@ function renderAtendimento(){
   if(em) em.style.display='none';
 
   const sellers=Object.values(usersById);
+  // pool primeiro (disponíveis pra pegar), depois o resto
+  f.sort((a,b)=> (a.assigned_to?1:0)-(b.assigned_to?1:0));
   tb.innerHTML=f.map(l=>{
-    const respBtn = !l.first_response_at ? `<button class="ibtn g" title="Registrar 1ª resposta" onclick="markFirstResponse('${l.id}')"><i class="ti ti-phone-check"></i></button>` : '';
+    const isPool = !l.assigned_to;
+    const respBtn = (!isPool && !l.first_response_at) ? `<button class="ibtn g" title="Registrar 1ª resposta" onclick="markFirstResponse('${l.id}')"><i class="ti ti-phone-check"></i></button>` : '';
     const wpp = l.whatsapp||l.phone;
-    const reass = me.role==='admin'
-      ? `<select onchange="reassignLead('${l.id}',this.value)" style="max-width:130px;padding:4px 6px;font-size:12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)">`
-        + `<option value="">— responsável —</option>`
-        + sellers.map(s=>`<option value="${s.id}" ${s.id===l.assigned_to?'selected':''}>${esc(s.name||s.email)}</option>`).join('')
-        + `</select>`
-      : `<span style="font-size:12px">${esc(sellerName(l.assigned_to))}</span>`;
+    const reass = isPool
+      ? `<span class="badge" style="background:var(--ambg);color:var(--amber)"><i class="ti ti-flame"></i> Disponível</span>`
+      : (me.role==='admin'
+        ? `<select onchange="reassignLead('${l.id}',this.value)" style="max-width:130px;padding:4px 6px;font-size:12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)">`
+          + `<option value="">— responsável —</option>`
+          + sellers.map(s=>`<option value="${s.id}" ${s.id===l.assigned_to?'selected':''}>${esc(s.name||s.email)}</option>`).join('')
+          + `</select>`
+        : `<span style="font-size:12px">${esc(sellerName(l.assigned_to))}</span>`);
     const mrr = l.deal_mrr?`<div style="font-size:10px;color:var(--green)">${money(l.deal_mrr)}/mês</div>`:'';
-    return `<tr>
+    return `<tr style="${isPool?'background:var(--ambg)':''}">
       <td><span class="cname" onclick="om('${l.id}')">${esc(l.name)}</span>${notesDot(l)}${followChip(l)}${mrr}</td>
       <td style="font-family:monospace;font-size:11px">${wpp?esc(wpp):'—'}</td>
       <td style="font-size:12px">${SOURCE_LABEL[l.source]||esc(l.source)}${l.campaign?`<div style="color:var(--t3);font-size:11px">${esc(l.campaign)}</div>`:''}</td>
@@ -891,6 +945,7 @@ function renderAtendimento(){
       <td>${slaBadge(l)}</td>
       <td>${badge(l.status)}</td>
       <td><div class="abtns">
+        ${isPool?`<button class="btn small btn-green" onclick="pegar('${l.id}')"><i class="ti ti-hand-click"></i> Pegar</button>`:''}
         ${wpp?`<button class="ibtn g" title="WhatsApp" onclick="owpp('${wpp}')"><i class="ti ti-brand-whatsapp"></i></button>`:''}
         ${respBtn}
         <button class="ibtn" title="Abrir" onclick="om('${l.id}')"><i class="ti ti-eye"></i></button>
@@ -935,12 +990,17 @@ function lockChip(l){
 }
 
 async function pegar(id){
-  const { error }=await SB.from('leads').update({ locked_by:me.id, locked_at:new Date().toISOString() }).eq('id',id).is('locked_by',null);
-  if(error){ alert('Não foi possível travar (talvez alguém pegou antes): '+error.message); }
+  // "Pegar" = assumir o lead: vira dono (assigned_to) e trava. Só se ainda estiver sem dono.
+  const { data, error }=await SB.from('leads')
+    .update({ assigned_to:me.id, assigned_at:new Date().toISOString(), locked_by:me.id, locked_at:new Date().toISOString() })
+    .eq('id',id).is('assigned_to',null).select();
+  if(error){ alert('Erro ao pegar: '+error.message); }
+  else if(!data || !data.length){ alert('Ops! Outro vendedor pegou esse lead primeiro.'); }
   await loadLeads();
 }
 async function liberar(id){
-  const { error }=await SB.from('leads').update({ locked_by:null, locked_at:null }).eq('id',id);
+  // Liberar = devolver pro pool (tira dono e trava)
+  const { error }=await SB.from('leads').update({ assigned_to:null, assigned_at:null, locked_by:null, locked_at:null }).eq('id',id);
   if(error){ alert('Erro ao liberar: '+error.message); }
   await loadLeads();
 }
