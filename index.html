@@ -379,6 +379,25 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
         <div class="sc"><div class="slabel">E-mail</div><div class="sval b" id="se">0</div></div>
         <div class="sc"><div class="slabel">Prontos</div><div class="sval p" id="sr">0</div></div>
       </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+        <div class="sub" style="margin:0">Sua base ativa — leads que você prospectou ou cadastrou.</div>
+        <button class="btn btn-primary" onclick="toggleNewLead()"><i class="ti ti-plus"></i> Novo lead</button>
+      </div>
+      <div class="cfgcard" id="newlead-form" style="display:none;margin-bottom:14px">
+        <strong style="display:block;margin-bottom:10px">Cadastrar lead ativo</strong>
+        <div class="row">
+          <div><label>Nome / Empresa *</label><input id="nl-name" placeholder="Ex: Salão da Ana"/></div>
+          <div><label>WhatsApp / Telefone</label><input id="nl-phone" placeholder="(11) 99999-9999"/></div>
+          <div><label>E-mail</label><input id="nl-email" type="email"/></div>
+        </div>
+        <div style="margin-top:10px"><label>Observação (opcional)</label>
+          <textarea id="nl-notes" rows="2" placeholder="De onde veio, o que combinou..." style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;resize:vertical;font-family:inherit"></textarea></div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn btn-green" onclick="saveNewLead()"><i class="ti ti-check"></i> Adicionar à minha base</button>
+          <button class="btn" onclick="toggleNewLead()">Cancelar</button>
+        </div>
+        <div class="cfgmsg" id="nl-msg"></div>
+      </div>
       <div class="frow">
         <input type="text" id="fq" placeholder="Buscar por nome, endereço..." oninput="rl()"/>
         <select id="fst" onchange="rl()">
@@ -867,8 +886,32 @@ function poolAlert(){
 }
 
 // separa os dois mundos: prospecção (outbound) x atendimento (inbound)
-function isProspeccao(l){ return !l.source || l.source==='manual'; }
-function isAtendimento(l){ return l.source && l.source!=='manual'; }
+const BASE_SOURCES=['manual','ativo']; // base do closer (não é funil/inbound)
+function isProspeccao(l){ return !l.source || BASE_SOURCES.includes(l.source); }
+function isAtendimento(l){ return l.source && !BASE_SOURCES.includes(l.source); }
+
+function toggleNewLead(){
+  const f=document.getElementById('newlead-form');
+  const show = f.style.display==='none';
+  f.style.display = show?'block':'none';
+  if(show){ ['nl-name','nl-phone','nl-email','nl-notes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';}); document.getElementById('nl-msg').style.display='none'; document.getElementById('nl-name').focus(); }
+}
+async function saveNewLead(){
+  const name=document.getElementById('nl-name').value.trim();
+  const phone=document.getElementById('nl-phone').value.trim();
+  const email=document.getElementById('nl-email').value.trim();
+  const notes=document.getElementById('nl-notes').value.trim();
+  const m=document.getElementById('nl-msg');
+  if(!name){ m.className='cfgmsg err'; m.textContent='Informe ao menos o nome/empresa.'; m.style.display='block'; return; }
+  const { error }=await SB.from('leads').insert({
+    company_id:me.company_id, name, phone:phone||null, whatsapp:phone||null, email:email||null,
+    notes:notes||null, source:'ativo', status:'novo',
+    assigned_to:me.id, assigned_at:new Date().toISOString(), created_by:me.id
+  });
+  if(error){ m.className='cfgmsg err'; m.textContent='Erro: '+error.message; m.style.display='block'; return; }
+  toggleNewLead();
+  await loadLeads(); nav('leads');
+}
 
 // ─── ATENDIMENTO (inbound) ─────────────────────────────────────────────────────
 const SLA_MIN=15; // minutos até estourar o SLA de 1ª resposta
