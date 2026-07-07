@@ -453,12 +453,14 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
         <div class="arow">
           <label>Google Places API Key <span class="req">*</span></label>
           <input type="password" id="cfg-places" placeholder="AIza..." autocomplete="off"/>
+          <button type="button" tabindex="-1" onclick="togglePass(this,'cfg-places')" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:16px"><i class="ti ti-eye"></i></button>
           <span class="apistat" id="st-places"><i class="ti ti-clock"></i> Pendente</span>
           <a href="https://console.cloud.google.com/apis/library/places-backend.googleapis.com" target="_blank" class="alink"><i class="ti ti-external-link"></i> Criar grátis</a>
         </div>
         <div class="arow">
           <label>Anthropic (Claude) API Key <span style="color:var(--t3);font-weight:400">(opcional)</span></label>
           <input type="password" id="cfg-claude" placeholder="sk-ant-..." autocomplete="off"/>
+          <button type="button" tabindex="-1" onclick="togglePass(this,'cfg-claude')" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:16px"><i class="ti ti-eye"></i></button>
           <span class="apistat" id="st-claude"><i class="ti ti-clock"></i> Pendente</span>
           <a href="https://console.anthropic.com/settings/keys" target="_blank" class="alink"><i class="ti ti-external-link"></i> Criar grátis</a>
         </div>
@@ -467,6 +469,7 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
           <div class="arow">
             <label>Search API Key</label>
             <input type="password" id="cfg-skey" placeholder="AIza..." autocomplete="off"/>
+            <button type="button" tabindex="-1" onclick="togglePass(this,'cfg-skey')" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:16px"><i class="ti ti-eye"></i></button>
             <a href="https://console.cloud.google.com/apis/library/customsearch.googleapis.com" target="_blank" class="alink"><i class="ti ti-external-link"></i> Ativar</a>
           </div>
           <div class="arow">
@@ -579,6 +582,9 @@ async function init(){
 
 // ─── GATE (telas de acesso) ─────────────────────────────────────────────────────
 function gate(html){ document.getElementById('gate-card').innerHTML=html; document.getElementById('gate').classList.add('show'); document.getElementById('app').style.display='none'; }
+// olhinho de mostrar/esconder senha
+function togglePass(btn,id){ const i=document.getElementById(id); if(!i) return; const show=i.type==='password'; i.type=show?'text':'password'; btn.innerHTML=show?'<i class="ti ti-eye-off"></i>':'<i class="ti ti-eye"></i>'; }
+function passField(id,extra){ return `<div style="position:relative"><input id="${id}" type="password" ${extra||''} style="width:100%;padding-right:42px"/><button type="button" tabindex="-1" onclick="togglePass(this,'${id}')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--t3);font-size:17px;padding:0;line-height:1"><i class="ti ti-eye"></i></button></div>`; }
 function gateMsg(t,cls){ const m=document.getElementById('gate-msg'); if(m){ m.className='gate-msg '+cls; m.textContent=t; } }
 const gateLogo=`<div class="gate-logo"><div class="logo-icon"><i class="ti ti-radar"></i></div><div><div class="logo-name">ProspectAI</div><div class="logo-sub">CRM B2B</div></div></div>`;
 
@@ -590,7 +596,8 @@ function showLogin(){
   gate(`${gateLogo}
     <h2>Entrar</h2><p class="sub">Acesse sua conta de vendedor</p>
     <label>E-mail</label><input id="g-email" type="email" autocomplete="email"/>
-    <label>Senha</label><input id="g-pass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"/>
+    <label>Senha</label>
+    <div style="position:relative"><input id="g-pass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()" style="width:100%;padding-right:42px"/><button type="button" tabindex="-1" onclick="togglePass(this,'g-pass')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--t3);font-size:17px;padding:0;line-height:1"><i class="ti ti-eye"></i></button></div>
     <div class="gate-msg" id="gate-msg"></div>
     <button class="btn btn-primary" onclick="doLogin()">Entrar</button>
     <div class="switch">Não tem conta? <a onclick="showSignup()">Criar conta</a></div>`);
@@ -603,7 +610,8 @@ function showSignup(){
   gate(`${gateLogo}
     <h2>Criar conta</h2>${convite}
     <label>E-mail</label><input id="g-email" type="email" autocomplete="email"/>
-    <label>Senha</label><input id="g-pass" type="password" minlength="6" autocomplete="new-password" onkeydown="if(event.key==='Enter')doSignup()"/>
+    <label>Senha</label>
+    <div style="position:relative"><input id="g-pass" type="password" minlength="6" autocomplete="new-password" onkeydown="if(event.key==='Enter')doSignup()" style="width:100%;padding-right:42px"/><button type="button" tabindex="-1" onclick="togglePass(this,'g-pass')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--t3);font-size:17px;padding:0;line-height:1"><i class="ti ti-eye"></i></button></div>
     <div class="gate-msg" id="gate-msg"></div>
     <button class="btn btn-primary" onclick="doSignup()">Criar conta e entrar</button>
     <div class="switch">Já tem conta? <a onclick="showLogin()">Entrar</a></div>`);
