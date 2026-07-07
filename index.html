@@ -565,9 +565,10 @@ async function init(){
 
   if(!SB){ showConfigNotice(); return; }
 
-  // link de convite: #join=CODIGO
-  const mh = location.hash.match(/join=([A-Za-z0-9]+)/);
-  if(mh){ pendingJoinCode = mh[1].toUpperCase(); }
+  // link de convite: aceita ?join=CODIGO e #join=CODIGO; guarda pra não perder no fluxo
+  const jm = (location.search+' '+location.hash).match(/join=([A-Za-z0-9]+)/);
+  if(jm){ pendingJoinCode = jm[1].toUpperCase(); ss('pendingjoin', pendingJoinCode); }
+  else if(ls('pendingjoin')){ pendingJoinCode = ls('pendingjoin'); }
 
   const { data:{ session } } = await SB.auth.getSession();
   if(session){ await afterLogin(session.user); }
@@ -601,15 +602,14 @@ function showLogin(){
 
 function showSignup(){
   const convite = pendingJoinCode
-    ? `<div class="gate-msg ok" style="display:block">🎉 Você foi convidado! Crie sua conta abaixo e já entra na empresa.</div>`
-    : `<p class="sub">Depois você cria ou entra numa empresa</p>`;
+    ? `<div class="gate-msg ok" style="display:block">🎉 Convite recebido! Crie sua conta e já entra na empresa.</div>`
+    : `<p class="sub">Crie sua conta de vendedor</p>`;
   gate(`${gateLogo}
     <h2>Criar conta</h2>${convite}
-    <label>Seu nome</label><input id="g-name"/>
     <label>E-mail</label><input id="g-email" type="email" autocomplete="email"/>
     <label>Senha</label><input id="g-pass" type="password" minlength="6" autocomplete="new-password" onkeydown="if(event.key==='Enter')doSignup()"/>
     <div class="gate-msg" id="gate-msg"></div>
-    <button class="btn btn-primary" onclick="doSignup()">Criar conta</button>
+    <button class="btn btn-primary" onclick="doSignup()">Criar conta e entrar</button>
     <div class="switch">Já tem conta? <a onclick="showLogin()">Entrar</a></div>`);
 }
 
@@ -650,15 +650,15 @@ async function doLogin(){
 }
 
 async function doSignup(){
-  const name=document.getElementById('g-name').value.trim();
   const email=document.getElementById('g-email').value.trim();
   const pass=document.getElementById('g-pass').value;
-  if(!name||!email||pass.length<6){ gateMsg('Preencha nome, e-mail e senha (mín. 6).','err'); return; }
+  if(!email||pass.length<6){ gateMsg('Preencha e-mail e senha (mín. 6 caracteres).','err'); return; }
+  const name=email.split('@')[0];
   gateMsg('Criando conta...','info');
   const { data, error }=await SB.auth.signUp({ email, password:pass, options:{ data:{ name } } });
   if(error){ gateMsg(traduz(error.message),'err'); return; }
   if(!data.session){ gateMsg('Conta criada! Confirme o e-mail e depois faça login.','ok'); return; }
-  // sessão já ativa → onAuthStateChange chama afterLogin → cai no onboarding
+  // sessão já ativa → onAuthStateChange chama afterLogin → entra automático via convite
 }
 
 async function doCreateCompany(){
@@ -677,7 +677,7 @@ async function doJoinCompany(){
   if(m){m.className='gate-msg info';m.textContent='Entrando...';}
   const { error }=await SB.rpc('join_company', { p_code:code });
   if(error){ if(m){m.className='gate-msg err';m.textContent=traduz(error.message);} return; }
-  await reloadMeAndBoot();
+  clearPendingJoin(); await reloadMeAndBoot();
 }
 
 async function logout(){ await SB.auth.signOut(); me=null; showLogin(); }
@@ -699,22 +699,33 @@ async function afterLogin(user){
   }
   me=prof;
   if(!me.company_id){
-    // veio por link de convite → entra automático, sem digitar código
-    if(pendingJoinCode){
-      const { error }=await SB.rpc('join_company', { p_code:pendingJoinCode });
-      pendingJoinCode=null;
-      if(!error){ await reloadMeAndBoot(); return; }
+    const code = pendingJoinCode || ls('pendingjoin');
+    if(code){
+      const { error }=await SB.rpc('join_company', { p_code:code });
+      if(!error){ clearPendingJoin(); await reloadMeAndBoot(); return; }
+      showJoinOnly(traduz(error.message)); return;   // código inválido → pede o certo
     }
-    showOnboarding(); return;
+    showJoinOnly(''); return;   // sem convite → só entrar com código (nunca "Criar empresa")
   }
   await boot();
+}
+function clearPendingJoin(){ pendingJoinCode=null; try{localStorage.removeItem('prospectai_pendingjoin');}catch(_){}; try{history.replaceState({},'',location.pathname);}catch(_){} }
+
+// Tela minimalista: só entrar com código (evita vendedor criar empresa solta)
+function showJoinOnly(err){
+  gate(`${gateLogo}
+    <h2>Entrar na empresa</h2><p class="sub">Digite o código da empresa que te convidou</p>
+    <label>Código da empresa</label><input id="g-code" placeholder="Ex: A1B2C3" style="text-transform:uppercase" onkeydown="if(event.key==='Enter')doJoinCompany()"/>
+    <div class="gate-msg ${err?'err':''}" id="gate-msg2" style="${err?'display:block':''}">${esc(err||'')}</div>
+    <button class="btn btn-primary" onclick="doJoinCompany()">Entrar</button>
+    <div class="switch"><a onclick="logout()">Sair</a></div>`);
 }
 
 async function reloadMeAndBoot(){
   const { data:{ user } }=await SB.auth.getUser();
   const prof=await loadMyProfile(user);
   me=prof;
-  if(!me || !me.company_id){ showOnboarding(); return; }
+  if(!me || !me.company_id){ showJoinOnly(''); return; }
   await boot();
 }
 
@@ -768,7 +779,7 @@ async function loadCompany(){
     document.getElementById('companyName').textContent=company.name;
     const jc=document.getElementById('joinCode'); if(jc) jc.textContent=company.join_code;
     const il=document.getElementById('inviteLink');
-    if(il) il.value = location.origin + '/#join=' + company.join_code;
+    if(il) il.value = location.origin + '/?join=' + company.join_code;
   }
 }
 
