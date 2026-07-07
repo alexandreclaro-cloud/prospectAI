@@ -426,17 +426,13 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
     <!-- EQUIPE (admin) -->
     <div class="view" id="v-equipe">
       <div class="cfgcard">
-        <h2>Convidar vendedores</h2>
-        <div class="sub">Mande o <strong>link de convite</strong> para o vendedor. Ele só cria a conta (nome, e-mail, senha) e já entra na sua empresa — sem digitar código.</div>
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-          <input id="inviteLink" readonly style="flex:1;min-width:260px;padding:9px 12px;border-radius:8px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:13px" value=""/>
-          <button class="btn btn-primary" onclick="copyInviteLink()"><i class="ti ti-link"></i> Copiar link de convite</button>
+        <h2>Adicionar vendedores</h2>
+        <div class="sub">Simples: peça pro vendedor abrir o site e clicar em <strong>"Criar conta"</strong> — só <strong>e-mail e senha</strong>. Ele já entra na sua empresa. Sem código, sem link.</div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0">
+          <input readonly style="flex:1;min-width:220px;padding:10px 12px;border-radius:8px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px" value="prospect-ai-rouge-one.vercel.app"/>
+          <button class="btn btn-primary" onclick="navigator.clipboard&&navigator.clipboard.writeText('https://prospect-ai-rouge-one.vercel.app')"><i class="ti ti-copy"></i> Copiar endereço</button>
         </div>
-        <div class="sub" style="margin:0">Ou passe só o código, se preferir:</div>
-        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px">
-          <span class="codebox" id="joinCode">------</span>
-          <button class="btn" onclick="copyCode()"><i class="ti ti-copy"></i> Copiar código</button>
-        </div>
+        <span id="inviteLink" style="display:none"></span><span id="joinCode" style="display:none"></span>
       </div>
       <div class="cfgcard">
         <h2>Equipe</h2>
@@ -705,7 +701,10 @@ async function afterLogin(user){
       if(!error){ clearPendingJoin(); await reloadMeAndBoot(); return; }
       showJoinOnly(traduz(error.message)); return;   // código inválido → pede o certo
     }
-    showJoinOnly(''); return;   // sem convite → só entrar com código (nunca "Criar empresa")
+    // sem convite → tenta auto-cadastro (entra sozinho na empresa aberta, só email+senha)
+    const { data:cid }=await SB.rpc('auto_join');
+    if(cid){ await reloadMeAndBoot(); return; }
+    showJoinOnly(''); return;   // cadastro fechado → precisa de código
   }
   await boot();
 }
@@ -780,7 +779,23 @@ async function loadCompany(){
     const jc=document.getElementById('joinCode'); if(jc) jc.textContent=company.join_code;
     const il=document.getElementById('inviteLink');
     if(il) il.value = location.origin + '/?join=' + company.join_code;
+    renderSignupToggle();
   }
+}
+function renderSignupToggle(){
+  const st=document.getElementById('signup-state'), bt=document.getElementById('signup-toggle');
+  if(!st||!bt||!company) return;
+  const open = company.open_signup!==false;
+  st.textContent = open ? '🟢 Cadastro aberto' : '🔴 Cadastro fechado';
+  bt.textContent = open ? 'Fechar cadastro' : 'Abrir cadastro';
+  bt.className = 'btn'+(open?'':' btn-green');
+}
+async function toggleOpenSignup(){
+  if(me.role!=='admin'||!company) return;
+  const novo = !(company.open_signup!==false);
+  const { error }=await SB.from('companies').update({ open_signup:novo }).eq('id',me.company_id);
+  if(error){ alert('Erro: '+error.message); return; }
+  company.open_signup=novo; renderSignupToggle();
 }
 
 function copyInviteLink(){
