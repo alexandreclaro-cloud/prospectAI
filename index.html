@@ -380,8 +380,23 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
         <div class="sc"><div class="slabel">Prontos</div><div class="sval p" id="sr">0</div></div>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-        <div class="sub" style="margin:0">Sua base ativa — leads que você prospectou ou cadastrou.</div>
-        <button class="btn btn-primary" onclick="toggleNewLead()"><i class="ti ti-plus"></i> Novo lead</button>
+        <div class="sub" style="margin:0">Sua base ativa — leads que você prospectou, cadastrou ou importou.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" onclick="toggleImport()"><i class="ti ti-file-upload"></i> Importar CSV</button>
+          <button class="btn btn-primary" onclick="toggleNewLead()"><i class="ti ti-plus"></i> Novo lead</button>
+        </div>
+      </div>
+      <div class="cfgcard" id="import-form" style="display:none;margin-bottom:14px">
+        <strong style="display:block;margin-bottom:6px">Importar leads de um CSV</strong>
+        <div class="sub" style="margin-bottom:10px">Exporte do Google Maps / Apify / planilha e suba aqui. Eu identifico as colunas (nome, telefone, e-mail, site...) automaticamente.</div>
+        <input type="file" id="csv-file" accept=".csv,text/csv" onchange="analyzeCsvFile(this)" style="margin-bottom:8px"/>
+        <div class="sub" style="margin:6px 0">ou cole o conteúdo do CSV:</div>
+        <textarea id="csv-paste" rows="3" placeholder="nome,telefone,email,site&#10;Barbearia X,11999...,x@x.com,site.com" style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;font-family:monospace;resize:vertical"></textarea>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn" onclick="analyzeCsvPaste()"><i class="ti ti-eye"></i> Analisar</button>
+          <button class="btn" onclick="toggleImport()">Cancelar</button>
+        </div>
+        <div id="import-preview" style="margin-top:12px"></div>
       </div>
       <div class="cfgcard" id="newlead-form" style="display:none;margin-bottom:14px">
         <strong style="display:block;margin-bottom:10px">Cadastrar lead ativo</strong>
@@ -954,6 +969,81 @@ async function saveNewLead(){
   if(error){ m.className='cfgmsg err'; m.textContent='Erro: '+error.message; m.style.display='block'; return; }
   toggleNewLead();
   await loadLeads(); nav('leads');
+}
+
+// ─── Importar leads de CSV ─────────────────────────────────────────────────────
+let importRows=[]; // leads prontos pra inserir
+function toggleImport(){
+  const f=document.getElementById('import-form');
+  const show=f.style.display==='none';
+  f.style.display=show?'block':'none';
+  if(show){ document.getElementById('csv-paste').value=''; document.getElementById('import-preview').innerHTML=''; const fi=document.getElementById('csv-file'); if(fi)fi.value=''; importRows=[]; }
+}
+function parseCSV(text){
+  text=text.replace(/^﻿/,'');
+  // detecta separador pela 1ª linha
+  const firstLine=text.slice(0, text.indexOf('\n')>0?text.indexOf('\n'):text.length);
+  const delim = (firstLine.split(';').length > firstLine.split(',').length) ? ';' : ',';
+  const rows=[]; let row=[], field='', q=false;
+  for(let i=0;i<text.length;i++){ const ch=text[i];
+    if(q){ if(ch==='"'){ if(text[i+1]==='"'){field+='"';i++;} else q=false; } else field+=ch; }
+    else { if(ch==='"') q=true; else if(ch===delim){ row.push(field); field=''; } else if(ch==='\n'){ row.push(field); rows.push(row); row=[]; field=''; } else if(ch!=='\r') field+=ch; }
+  }
+  if(field.length||row.length){ row.push(field); rows.push(row); }
+  return rows.filter(r=>r.some(c=>c&&c.trim()));
+}
+function norm(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,''); }
+function mapHeaders(headers){
+  const H=headers.map(norm);
+  const find=(...keys)=>{ for(const k of keys){ const i=H.findIndex(h=>h===k); if(i>=0)return i; } for(const k of keys){ const i=H.findIndex(h=>h.includes(k)); if(i>=0)return i; } return -1; };
+  return {
+    name: find('name','nome','title','empresa','business','razaosocial','fantasia'),
+    phone: find('phone','telefone','fone','celular','phonenumber','phoneunformatted','numero'),
+    whatsapp: find('whatsapp','whats','wpp'),
+    email: find('email','emails','mail'),
+    site: find('website','site','url','domain','webpage'),
+    address: find('address','endereco','location','fulladdress','street'),
+    instagram: find('instagram','instagramurl','ig','perfilinstagram')
+  };
+}
+function analyzeCsvFile(input){ const f=input.files&&input.files[0]; if(!f)return; const r=new FileReader(); r.onload=e=>{ document.getElementById('csv-paste').value=e.target.result; analyzeCsvPaste(); }; r.readAsText(f); }
+function analyzeCsvPaste(){
+  const text=document.getElementById('csv-paste').value.trim();
+  const box=document.getElementById('import-preview');
+  if(!text){ box.innerHTML='<div class="cfgmsg err" style="display:block">Cole um CSV ou escolha um arquivo.</div>'; return; }
+  const rows=parseCSV(text);
+  if(rows.length<2){ box.innerHTML='<div class="cfgmsg err" style="display:block">CSV vazio ou só com cabeçalho.</div>'; return; }
+  const headers=rows[0], map=mapHeaders(headers);
+  if(map.name<0){ box.innerHTML='<div class="cfgmsg err" style="display:block">Não achei uma coluna de <strong>nome</strong>. Verifique o cabeçalho do CSV.</div>'; return; }
+  const get=(r,i)=>i>=0?(r[i]||'').trim():'';
+  importRows=rows.slice(1).map(r=>{
+    const phone=get(r,map.phone)||get(r,map.whatsapp);
+    return { name:get(r,map.name), phone:phone||null, whatsapp:(get(r,map.whatsapp)||phone)||null,
+      email:get(r,map.email)||null, site:get(r,map.site)||null, address:get(r,map.address)||null, instagram:get(r,map.instagram)||null };
+  }).filter(l=>l.name);
+  const cols=Object.entries(map).filter(([k,v])=>v>=0).map(([k,v])=>`<span class="badge bpronto">${k} ← ${esc(headers[v])}</span>`).join(' ');
+  box.innerHTML=`<div style="font-size:13px;margin-bottom:8px"><strong>${importRows.length} leads</strong> encontrados. Colunas: ${cols}</div>
+    <div class="twrap" style="max-height:180px;overflow:auto"><table><thead><tr><th>Nome</th><th>Telefone</th><th>E-mail</th></tr></thead><tbody>
+    ${importRows.slice(0,5).map(l=>`<tr><td>${esc(l.name)}</td><td>${esc(l.phone||'—')}</td><td>${esc(l.email||'—')}</td></tr>`).join('')}
+    </tbody></table></div>
+    <button class="btn btn-green" style="margin-top:10px" onclick="doImport()"><i class="ti ti-download"></i> Importar ${importRows.length} leads pra minha base</button>
+    <div class="cfgmsg" id="import-msg"></div>`;
+}
+async function doImport(){
+  if(!importRows.length) return;
+  const m=document.getElementById('import-msg'); m.className='cfgmsg info'; m.textContent='Importando...'; m.style.display='block';
+  const now=new Date().toISOString();
+  const payload=importRows.map(l=>({ company_id:me.company_id, name:l.name, phone:l.phone, whatsapp:l.whatsapp,
+    email:l.email, site:l.site, address:l.address, instagram:l.instagram, source:'importado', status:'novo',
+    assigned_to:me.id, assigned_at:now, created_by:me.id }));
+  let ok=0;
+  for(let i=0;i<payload.length;i+=200){
+    const { error }=await SB.from('leads').insert(payload.slice(i,i+200));
+    if(error){ m.className='cfgmsg err'; m.textContent='Erro após '+ok+' leads: '+error.message; return; }
+    ok+=payload.slice(i,i+200).length;
+  }
+  m.className='cfgmsg ok'; m.textContent=ok+' leads importados! ✅';
+  await loadLeads(); setTimeout(()=>{ toggleImport(); nav('leads'); }, 900);
 }
 
 // ─── ATENDIMENTO (inbound) ─────────────────────────────────────────────────────
