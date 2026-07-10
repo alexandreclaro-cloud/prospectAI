@@ -312,6 +312,11 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
           <option value="ganho">Ganho</option>
           <option value="perdido">Perdido</option>
         </select>
+        <select id="at-resp" onchange="renderAtendimento()">
+          <option value="">Responsável: todos</option>
+          <option value="pool">🔥 Disponíveis</option>
+          <option value="meus">👤 Meus</option>
+        </select>
       </div>
       <div class="twrap"><table><thead><tr>
         <th>Lead</th><th>Contato</th><th>Origem / Campanha</th><th>Responsável</th><th>SLA 1ª resposta</th><th>Status</th><th>Ações</th>
@@ -1121,7 +1126,8 @@ function renderAtendimento(){
   // filtros
   const q=(document.getElementById('at-q')?.value||'').toLowerCase();
   const st=document.getElementById('at-filter')?.value||'';
-  const f=all.filter(l=>(!q||l.name?.toLowerCase().includes(q)||(l.phone||'').includes(q)||(l.campaign||'').toLowerCase().includes(q))&&(!st||l.status===st));
+  const resp=document.getElementById('at-resp')?.value||'';
+  const f=all.filter(l=>(!q||l.name?.toLowerCase().includes(q)||(l.phone||'').includes(q)||(l.campaign||'').toLowerCase().includes(q))&&(!st||l.status===st)&&(!resp||(resp==='pool'?!l.assigned_to:l.assigned_to===me.id)));
   const em=document.getElementById('at-empty');
   if(!f.length){ tb.innerHTML=''; if(em) em.style.display='block'; return; }
   if(em) em.style.display='none';
