@@ -904,7 +904,7 @@ function rowToLead(r){
     notes:r.notes||'', follow_up_at:r.follow_up_at||null,
     source:r.source||'manual', campaign:r.campaign||null, assigned_to:r.assigned_to||null,
     assigned_at:r.assigned_at||null, first_response_at:r.first_response_at||null,
-    deal_setup:r.deal_setup||null, deal_mrr:r.deal_mrr||null };
+    deal_setup:r.deal_setup||null, deal_mrr:r.deal_mrr||null, wa_clicked_at:r.wa_clicked_at||null };
 }
 function leadToRow(l){
   return { company_id:me.company_id, external_id:l.external_id||l.id||null, name:l.name, address:l.address||null,
@@ -1069,6 +1069,12 @@ function copyCaptureLink(){
   const b=event?.currentTarget; if(b){ const o=b.innerHTML; b.innerHTML='<i class="ti ti-check"></i> Copiado!'; setTimeout(()=>b.innerHTML=o,1200); }
 }
 
+// Fase do lead vindo de funil: preencheu e foi pro WhatsApp (🔥) ou só preencheu (😐)
+function wppPhase(l){
+  if(!isAtendimento(l)) return '';
+  if(l.wa_clicked_at) return `<div style="margin-top:3px"><span class="badge" style="background:var(--green);color:#fff" title="Preencheu e clicou pra ir pro WhatsApp"><i class="ti ti-brand-whatsapp"></i> Foi pro WhatsApp</span></div>`;
+  return `<div style="margin-top:3px"><span class="badge" style="background:var(--border);color:var(--t3)" title="Preencheu o formulário, mas não clicou no WhatsApp"><i class="ti ti-forms"></i> Só preencheu</span></div>`;
+}
 function renderAtendimento(){
   const tb=document.getElementById('at-tbody'); if(!tb||!me) return;
   // link de captura (admin)
@@ -1116,7 +1122,7 @@ function renderAtendimento(){
     return `<tr style="${isPool?'background:var(--ambg)':''}">
       <td><span class="cname" onclick="om('${l.id}')">${esc(l.name)}</span>${notesDot(l)}${followChip(l)}${mrr}</td>
       <td style="font-family:monospace;font-size:11px">${wpp?esc(wpp):'—'}</td>
-      <td style="font-size:12px">${SOURCE_LABEL[l.source]||esc(l.source)}${l.campaign?`<div style="color:var(--t3);font-size:11px">${esc(l.campaign)}</div>`:''}</td>
+      <td style="font-size:12px">${SOURCE_LABEL[l.source]||esc(l.source)}${l.campaign?`<div style="color:var(--t3);font-size:11px">${esc(l.campaign)}</div>`:''}${wppPhase(l)}</td>
       <td>${reass}</td>
       <td>${slaBadge(l)}</td>
       <td>${badge(l.status)}</td>
