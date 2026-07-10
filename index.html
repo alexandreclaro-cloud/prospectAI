@@ -904,7 +904,7 @@ function rowToLead(r){
     notes:r.notes||'', follow_up_at:r.follow_up_at||null,
     source:r.source||'manual', campaign:r.campaign||null, assigned_to:r.assigned_to||null,
     assigned_at:r.assigned_at||null, first_response_at:r.first_response_at||null,
-    deal_setup:r.deal_setup||null, deal_mrr:r.deal_mrr||null, wa_clicked_at:r.wa_clicked_at||null };
+    deal_setup:r.deal_setup||null, deal_mrr:r.deal_mrr||null, wa_clicked_at:r.wa_clicked_at||null, meeting_at:r.meeting_at||null };
 }
 function leadToRow(l){
   return { company_id:me.company_id, external_id:l.external_id||l.id||null, name:l.name, address:l.address||null,
@@ -915,6 +915,7 @@ function leadToRow(l){
 }
 
 let poolSeen=null; // ids do pool já vistos (pra alertar só nos novos)
+let meetingSeen=null; // reuniões já vistas (id+hora), pra alertar em nova/reagendada
 async function loadLeads(){
   const { data, error }=await SB.from('leads').select('*').order('created_at',{ascending:false});
   if(error){ console.error(error); return; }
@@ -922,7 +923,7 @@ async function loadLeads(){
   updateStats();
   const prosp=leads.filter(isProspeccao).length;
   document.getElementById('nb').textContent=prosp;
-  poolAlert();
+  poolAlert(); meetingAlert();
   rl(); rp(); renderAtendimento();
 }
 function poolLeads(){ return leads.filter(l=>isAtendimento(l) && !l.assigned_to && l.status!=='ganho' && l.status!=='perdido'); }
@@ -939,6 +940,21 @@ function poolAlert(){
     ensureAudio(); beep();
     if('Notification' in window && Notification.permission==='granted'){
       novos.forEach(id=>{ const l=leads.find(x=>x.id===id); if(l){ try{ new Notification('🔥 Lead novo disponível!',{body:(l.name||'')+' — '+(l.campaign||l.source||'')+' · clique em Pegar'}); }catch(_){} } });
+    }
+  }
+}
+
+// alerta quando um lead marca reunião pela agenda (Google -> record_meeting)
+function meetingAlert(){
+  const comReuniao=leads.filter(l=>l.meeting_at);
+  const ids=new Set(comReuniao.map(l=>l.id+'|'+l.meeting_at)); // id+hora: reagendar re-alerta
+  if(meetingSeen===null){ meetingSeen=ids; return; } // primeira carga: sem alerta retroativo
+  const novos=[...ids].filter(k=>!meetingSeen.has(k));
+  meetingSeen=ids;
+  if(novos.length && document.visibilityState==='visible'){
+    ensureAudio(); beep();
+    if('Notification' in window && Notification.permission==='granted'){
+      novos.forEach(k=>{ const l=leads.find(x=>x.id===k.split('|')[0]); if(l){ try{ new Notification('📅 Reunião agendada!',{body:(l.name||'Alguém')+' marcou uma reunião com você'}); }catch(_){} } });
     }
   }
 }
@@ -1048,7 +1064,7 @@ async function doImport(){
 
 // ─── ATENDIMENTO (inbound) ─────────────────────────────────────────────────────
 const SLA_MIN=15; // minutos até estourar o SLA de 1ª resposta
-const SOURCE_LABEL={landing:'Landing/Form',meta:'Meta Ads',google:'Google Ads',csv:'Importação',whatsapp:'WhatsApp'};
+const SOURCE_LABEL={landing:'Landing/Form',meta:'Meta Ads',google:'Google Ads',csv:'Importação',whatsapp:'WhatsApp',agendamento:'Agendou reunião'};
 function sellerName(id){ return id ? (usersById[id]?.name || 'alguém') : '—'; }
 function minsSince(iso){ return Math.floor((Date.now()-new Date(iso).getTime())/60000); }
 function slaBadge(l){
@@ -1074,6 +1090,12 @@ function wppPhase(l){
   if(!isAtendimento(l)) return '';
   if(l.wa_clicked_at) return `<div style="margin-top:3px"><span class="badge" style="background:var(--green);color:#fff" title="Preencheu e clicou pra ir pro WhatsApp"><i class="ti ti-brand-whatsapp"></i> Foi pro WhatsApp</span></div>`;
   return `<div style="margin-top:3px"><span class="badge" style="background:var(--border);color:var(--t3)" title="Preencheu o formulário, mas não clicou no WhatsApp"><i class="ti ti-forms"></i> Só preencheu</span></div>`;
+}
+// Lead que marcou reunião pela agenda (Google) — sinal mais quente
+function meetingBadge(l){
+  if(!l.meeting_at) return '';
+  let dt=''; try{ dt=new Date(l.meeting_at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(_){}
+  return ` <span class="badge" style="background:var(--purple);color:#fff" title="Agendou uma reunião"><i class="ti ti-calendar-event"></i> 📅 Reunião ${dt}</span>`;
 }
 function renderAtendimento(){
   const tb=document.getElementById('at-tbody'); if(!tb||!me) return;
@@ -1120,7 +1142,7 @@ function renderAtendimento(){
         : `<span style="font-size:12px">${esc(sellerName(l.assigned_to))}</span>`);
     const mrr = l.deal_mrr?`<div style="font-size:10px;color:var(--green)">${money(l.deal_mrr)}/mês</div>`:'';
     return `<tr style="${isPool?'background:var(--ambg)':''}">
-      <td><span class="cname" onclick="om('${l.id}')">${esc(l.name)}</span>${notesDot(l)}${followChip(l)}${mrr}</td>
+      <td><span class="cname" onclick="om('${l.id}')">${esc(l.name)}</span>${notesDot(l)}${followChip(l)}${meetingBadge(l)}${mrr}</td>
       <td style="font-family:monospace;font-size:11px">${wpp?esc(wpp):'—'}</td>
       <td style="font-size:12px">${SOURCE_LABEL[l.source]||esc(l.source)}${l.campaign?`<div style="color:var(--t3);font-size:11px">${esc(l.campaign)}</div>`:''}${wppPhase(l)}</td>
       <td>${reass}</td>

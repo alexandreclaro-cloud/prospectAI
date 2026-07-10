@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Copiar SQL Script — ProspectAI</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0b1020;color:#e8ecf5;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .card{background:#141a2e;border:1px solid #263050;border-radius:16px;padding:32px;max-width:560px;width:100%}
+  h1{margin:0 0 6px;font-size:22px}
+  p{color:#9aa4c0;font-size:15px;line-height:1.6}
+  .step{margin:14px 0;font-size:15px}
+  .num{display:inline-flex;width:24px;height:24px;border-radius:50%;background:#7c5cff;color:#fff;align-items:center;justify-content:center;font-weight:700;font-size:13px;margin-right:8px}
+  button{width:100%;margin-top:20px;padding:16px;font-size:18px;font-weight:700;border:none;border-radius:12px;background:linear-gradient(135deg,#7c5cff,#5b8cff);color:#fff;cursor:pointer}
+  button:active{transform:scale(.98)}
+  #ok{margin-top:16px;padding:12px;border-radius:10px;background:#0f2a1c;color:#35c88a;font-weight:600;display:none;text-align:center}
+  a{color:#5b8cff;font-weight:600}
+  code{background:#0e1426;padding:2px 6px;border-radius:5px;font-size:13px}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>📅 Agendou reunião (Google Agenda → CRM) — SQL</h1>
+    <p>Um clique copia o SQL (coluna <code>meeting_at</code> + função <code>record_meeting</code>). Idempotente.</p>
+    <button id="btn" onclick="copiar()">Copiar SQL ✓</button>
+    <div id="ok">✅ Copiado! Vá ao Supabase e cole (⌘V).</div>
+    <div style="margin-top:22px">
+      <div class="step"><span class="num">1</span> Clique em <strong>Copiar SQL</strong></div>
+      <div class="step"><span class="num">2</span> Abra o <a href="https://supabase.com/dashboard/project/buoaumgjjqtfavxfrwsz/sql/new" target="_blank">SQL Editor do Supabase</a></div>
+      <div class="step"><span class="num">3</span> <code>⌘A</code> → <code>Delete</code> → <code>⌘V</code> → <code>⌘Enter</code> (Run)</div>
+    </div>
+  </div>
+<script>
+let SQL="";
+fetch('/agendamento-reuniao.sql').then(r=>r.text()).then(t=>{ SQL=t; });
+async function copiar(){
+  try{ if(!SQL){ SQL=await fetch('/agendamento-reuniao.sql').then(r=>r.text()); }
+    await navigator.clipboard.writeText(SQL);
+    document.getElementById('ok').style.display='block';
+    document.getElementById('btn').textContent='Copiado ✓';
+  }catch(e){ alert('Não consegui copiar: '+e.message); }
+}
+</script>
+</body>
+</html>
