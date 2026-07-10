@@ -1088,6 +1088,7 @@ function copyCaptureLink(){
 // Fase do lead vindo de funil: preencheu e foi pro WhatsApp (🔥) ou só preencheu (😐)
 function wppPhase(l){
   if(!isAtendimento(l)) return '';
+  if(l.meeting_at) return ''; // já agendou reunião: o badge de reunião cobre esse status
   if(l.wa_clicked_at) return `<div style="margin-top:3px"><span class="badge" style="background:var(--green);color:#fff" title="Preencheu e clicou pra ir pro WhatsApp"><i class="ti ti-brand-whatsapp"></i> Foi pro WhatsApp</span></div>`;
   return `<div style="margin-top:3px"><span class="badge" style="background:var(--border);color:var(--t3)" title="Preencheu o formulário, mas não clicou no WhatsApp"><i class="ti ti-forms"></i> Só preencheu</span></div>`;
 }
@@ -1095,7 +1096,7 @@ function wppPhase(l){
 function meetingBadge(l){
   if(!l.meeting_at) return '';
   let dt=''; try{ dt=new Date(l.meeting_at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(_){}
-  return ` <span class="badge" style="background:var(--purple);color:#fff" title="Agendou uma reunião"><i class="ti ti-calendar-event"></i> 📅 Reunião ${dt}</span>`;
+  return `<div style="margin-top:3px"><span class="badge" style="background:var(--purple);color:#fff" title="Agendou uma reunião"><i class="ti ti-calendar-event"></i> 📅 Reunião ${dt}</span></div>`;
 }
 function renderAtendimento(){
   const tb=document.getElementById('at-tbody'); if(!tb||!me) return;
