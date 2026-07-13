@@ -1651,8 +1651,14 @@ function om(id,fr=false){
   const row=(ic,lb,val,cls='')=>`<div class="mrow"><span class="mlabel"><i class="ti ti-${ic}"></i> ${lb}</span><span class="mval ${cls||(!val?'none':'found')}">${val||'Não encontrado'}</span></div>`;
   const plVal=(v)=>{ if(v==null) return '—'; if(typeof v==='object'){ return v.val!==undefined ? String(v.val) : Object.values(v).map(x=>typeof x==='object'?(x.val!==undefined?x.val:JSON.stringify(x)):x).join(' · '); } return String(v); };
   const pl=l.source_payload;
-  const quizCol=(pl && typeof pl==='object' && Object.keys(pl).length)
+  const hasQuiz=(pl && typeof pl==='object' && Object.keys(pl).length);
+  // se já tem anotação salva, mostra as respostas numa seção separada;
+  // senão, elas entram pré-preenchidas na caixa de Observações (quizNote, abaixo)
+  const quizCol=(hasQuiz && (l.notes||'').trim())
     ? `<div class="msec" style="margin-top:0">📋 Respostas do quiz</div>`+Object.entries(pl).map(([k,v])=>row('point',esc(k),esc(plVal(v)),'found')).join('')
+    : '';
+  const quizNote=hasQuiz
+    ? '📋 Respostas do quiz:\n'+Object.entries(pl).map(([k,v])=>'• '+k+': '+plVal(v)).join('\n')+'\n\n— Minhas anotações:\n'
     : '';
   const infoCol=`
     ${quizCol}
@@ -1669,7 +1675,7 @@ function om(id,fr=false){
   const workCol=inCrm?`
       <div class="msec" style="margin-top:0">Observações & Agendamento</div>
       <label style="font-size:12px;color:var(--t2);display:block;margin-bottom:4px">O que combinei / anotações da conversa</label>
-      <textarea id="lead-notes" rows="5" placeholder="Ex: Liguei dia 03/07, falei com a Ana, retornar semana que vem com proposta..." style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;resize:vertical;font-family:inherit">${esc(l.notes||'')}</textarea>
+      <textarea id="lead-notes" rows="5" placeholder="Ex: Liguei dia 03/07, falei com a Ana, retornar semana que vem com proposta..." style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;resize:vertical;font-family:inherit">${esc(l.notes||quizNote)}</textarea>
       <label style="font-size:12px;color:var(--t2);display:block;margin:10px 0 4px">Agendar retorno (data e hora)</label>
       <input id="lead-followup" type="datetime-local" value="${toLocalInput(l.follow_up_at)}" style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px"/>
       <div class="msec">Valor do negócio</div>
