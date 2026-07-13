@@ -1160,6 +1160,7 @@ function renderAtendimento(){
         ${wpp?`<button class="ibtn g" title="WhatsApp" onclick="owpp('${wpp}')"><i class="ti ti-brand-whatsapp"></i></button>`:''}
         ${respBtn}
         <button class="ibtn" title="Abrir" onclick="om('${l.id}')"><i class="ti ti-eye"></i></button>
+        ${me.role==='admin'?`<button class="ibtn r" title="Excluir lead" onclick="event.stopPropagation();rmv('${l.id}')"><i class="ti ti-trash"></i></button>`:''}
       </div></td>
     </tr>`;
   }).join('');
