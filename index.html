@@ -124,6 +124,78 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
 .mcols{display:flex;gap:24px;align-items:flex-start}
 .mcol{flex:1;min-width:0}
 @media(max-width:720px){.mcols{flex-direction:column;gap:10px}}
+
+/* ===== Hamburguer + gaveta (base, escondidos no desktop) ===== */
+.hamb{display:none;width:38px;height:38px;flex-shrink:0;border:1px solid var(--border);background:var(--surface);border-radius:9px;align-items:center;justify-content:center;font-size:20px;color:var(--text);cursor:pointer}
+.nav-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:150}
+
+/* ===== MOBILE ===== */
+@media(max-width:768px){
+  body{font-size:15px}
+  .app{height:auto;min-height:100vh;overflow:visible;overflow-x:hidden}
+  main{overflow:visible;min-width:0;max-width:100%}
+  .content{overflow-y:visible;padding:12px;min-width:0}
+
+  /* menu lateral vira gaveta deslizante */
+  aside{position:fixed;top:0;left:0;bottom:0;width:250px;max-width:82vw;z-index:200;overflow-y:auto;transform:translateX(-100%);transition:transform .25s ease;box-shadow:0 0 40px rgba(0,0,0,.28)}
+  body.nav-open aside{transform:none}
+  body.nav-open .nav-ov{display:block}
+  .hamb{display:inline-flex}
+  .nav-item{padding:13px 16px;font-size:15px}
+  .nav-sec{padding:14px 16px 4px}
+
+  /* topbar fixa no topo */
+  .topbar{position:sticky;top:0;z-index:50;padding:10px 12px;gap:8px;flex-wrap:wrap}
+  .topbar h1{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tactions{gap:6px;flex-wrap:wrap;justify-content:flex-end;min-width:0}
+  .tactions .btn{font-size:13px}
+  .tactions .btn{padding:8px 11px}
+  .userchip .uname,.userchip .urole{display:none}
+
+  /* alvos de toque maiores */
+  .btn{padding:10px 14px;font-size:14px}
+  .ibtn{width:34px;height:34px;font-size:15px}
+
+  /* grids empilham */
+  .sgrid{grid-template-columns:1fr 1fr;gap:8px}
+  .sc{padding:12px}.sval{font-size:22px}
+  .cgrid{grid-template-columns:1fr;gap:8px}
+  .frow{flex-direction:column;align-items:stretch}
+  .frow input,.frow select{width:100%;min-width:0}
+  .arow{flex-direction:column;align-items:stretch;gap:6px}
+  .arow label{width:auto}
+  .crow{flex-direction:column}
+
+  /* tabelas viram cards */
+  .twrap{border:none;background:transparent;border-radius:0;overflow:visible}
+  .twrap table{display:block;table-layout:auto}
+  .twrap thead{display:none}
+  .twrap tbody{display:block}
+  .twrap tr{display:block;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;padding:8px 14px}
+  .twrap tr:hover td{background:transparent}
+  .twrap td{display:block;width:auto!important;border:none!important;padding:6px 0;white-space:normal;overflow:visible;text-overflow:clip;font-size:14px}
+  .twrap td+td{border-top:1px solid var(--border)!important}
+  .twrap td[data-label]{display:flex;justify-content:space-between;align-items:center;gap:14px}
+  .twrap td[data-label]::before{content:attr(data-label);font-weight:600;color:var(--t3);font-size:11px;text-transform:uppercase;letter-spacing:.03em;flex-shrink:0}
+  .twrap td:first-child{display:block;font-size:16px;font-weight:600}
+  .twrap td:first-child::before{display:none}
+  .twrap td.td-actions{padding-top:10px}
+  .twrap td.td-actions::before{display:none}
+  .twrap td.td-actions .abtns{justify-content:flex-start;flex-wrap:wrap;gap:6px}
+  .twrap td.td-actions .btn.small{padding:9px 12px}
+  .cname{font-size:16px}
+  .twrap td select{max-width:62%}
+
+  /* kanban rola na horizontal */
+  .kanban{display:flex;grid-template-columns:none;overflow-x:auto;gap:10px;padding-bottom:8px;-webkit-overflow-scrolling:touch}
+  .kcol{min-width:78vw;flex-shrink:0}
+  .stage{font-size:9px;padding:5px 2px}
+
+  /* modal vira folha de baixo pra cima */
+  .modal-ov{padding:0;align-items:flex-end}
+  .modal{max-width:100%;width:100%;border-radius:16px 16px 0 0;max-height:94vh;padding:18px}
+  .mtitle h3{font-size:16px}
+}
 .modal .mval{max-width:none}
 .mtitle{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;gap:10px}
 .mtitle h3{font-size:16px;font-weight:700}
@@ -204,10 +276,14 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
   <div class="nav-item" data-nav="config" onclick="nav('config')"><i class="ti ti-settings"></i> Configurações</div>
   <div class="sfooter" id="sfooter">Carregando...</div>
 </aside>
+<div class="nav-ov" onclick="toggleNav()"></div>
 
 <main>
   <div class="topbar">
-    <h1 id="ptitle">Agente de prospecção</h1>
+    <div style="display:flex;align-items:center;gap:10px;min-width:0">
+      <button class="hamb" onclick="toggleNav()" aria-label="Menu"><i class="ti ti-menu-2"></i></button>
+      <h1 id="ptitle">Agente de prospecção</h1>
+    </div>
     <div class="tactions">
       <button class="btn" id="presenceBtn" onclick="toggleAvailable()" title="Clique para ficar Disponível ou Ausente">Disponível</button>
       <button class="btn" onclick="exportCSV()"><i class="ti ti-download"></i> Exportar CSV</button>
@@ -1150,13 +1226,13 @@ function renderAtendimento(){
         : `<span style="font-size:12px">${esc(sellerName(l.assigned_to))}</span>`);
     const mrr = l.deal_mrr?`<div style="font-size:10px;color:var(--green)">${money(l.deal_mrr)}/mês</div>`:'';
     return `<tr style="${isPool?'background:var(--ambg)':''}">
-      <td><span class="cname" onclick="om('${l.id}')">${esc(l.name)}</span>${notesDot(l)}${followChip(l)}${meetingBadge(l)}${mrr}</td>
-      <td style="font-family:monospace;font-size:11px">${wpp?esc(wpp):'—'}</td>
-      <td style="font-size:12px">${SOURCE_LABEL[l.source]||esc(l.source)}${l.campaign?`<div style="color:var(--t3);font-size:11px">${esc(l.campaign)}</div>`:''}${wppPhase(l)}</td>
-      <td>${reass}</td>
-      <td>${slaBadge(l)}</td>
-      <td>${badge(l.status)}</td>
-      <td><div class="abtns">
+      <td data-label="Lead"><span class="cname" onclick="om('${l.id}')">${esc(l.name)}</span>${notesDot(l)}${followChip(l)}${meetingBadge(l)}${mrr}</td>
+      <td data-label="Contato" style="font-family:monospace;font-size:11px">${wpp?esc(wpp):'—'}</td>
+      <td data-label="Origem" style="font-size:12px">${SOURCE_LABEL[l.source]||esc(l.source)}${l.campaign?`<div style="color:var(--t3);font-size:11px">${esc(l.campaign)}</div>`:''}${wppPhase(l)}</td>
+      <td data-label="Responsável">${reass}</td>
+      <td data-label="SLA">${slaBadge(l)}</td>
+      <td data-label="Status">${badge(l.status)}</td>
+      <td class="td-actions"><div class="abtns">
         ${isPool?`<button class="btn small btn-green" onclick="pegar('${l.id}')"><i class="ti ti-hand-click"></i> Pegar</button>`:''}
         ${wpp?`<button class="ibtn g" title="WhatsApp" onclick="owpp('${wpp}')"><i class="ti ti-brand-whatsapp"></i></button>`:''}
         ${respBtn}
@@ -1220,7 +1296,9 @@ async function liberar(id){
 
 // ─── Nav ──────────────────────────────────────────────────────────────────────
 const titles={atendimento:'Atendimento',whatsapp:'WhatsApp',script:'Script de vendas',agente:'Agente de prospecção',leads:'Leads',pipeline:'Pipeline',equipe:'Equipe',config:'Configurações'};
+function toggleNav(){ document.body.classList.toggle('nav-open'); }
 function nav(v){
+  document.body.classList.remove('nav-open');
   document.querySelectorAll('.view').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
   document.getElementById('v-'+v).classList.add('active');
