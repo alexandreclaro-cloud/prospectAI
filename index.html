@@ -986,6 +986,7 @@ function rowToLead(r){
     whatsapp:r.whatsapp, email:r.email, site:r.site, instagram:r.instagram, linkedin:r.linkedin,
     decisor:r.decisor, decisorCargo:r.decisor_cargo, rating:r.rating, totalRatings:r.total_ratings,
     score:r.score, status:r.status, locked_by:r.locked_by, locked_at:r.locked_at, created_by:r.created_by, created_at:r.created_at,
+    updated_at:r.updated_at||null,
     notes:r.notes||'', follow_up_at:r.follow_up_at||null,
     source:r.source||'manual', campaign:r.campaign||null, assigned_to:r.assigned_to||null,
     assigned_at:r.assigned_at||null, first_response_at:r.first_response_at||null,
@@ -1163,6 +1164,15 @@ const SLA_MIN=15; // minutos até estourar o SLA de 1ª resposta
 const SOURCE_LABEL={landing:'Landing/Form',meta:'Meta Ads',google:'Google Ads',csv:'Importação',whatsapp:'WhatsApp',agendamento:'Agendou reunião'};
 function sellerName(id){ return id ? (usersById[id]?.name || 'alguém') : '—'; }
 function minsSince(iso){ return Math.floor((Date.now()-new Date(iso).getTime())/60000); }
+// Tempo relativo amigável: "agora", "há 5min", "há 3h", "há 2 dias".
+function tempoAtras(iso){
+  if(!iso) return '—';
+  const m=minsSince(iso);
+  if(m<1) return 'agora'; if(m<60) return 'há '+m+'min';
+  const h=Math.floor(m/60); if(h<24) return 'há '+h+'h';
+  const d=Math.floor(h/24); return 'há '+d+(d===1?' dia':' dias');
+}
+function fmtDataHora(iso){ if(!iso) return ''; const d=new Date(iso); const p=n=>String(n).padStart(2,'0'); return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear()+' '+p(d.getHours())+':'+p(d.getMinutes()); }
 function slaBadge(l){
   const start=l.assigned_at||l.created_at;
   if(l.first_response_at){
@@ -1295,7 +1305,7 @@ function lockChip(l){
 async function pegar(id){
   // "Pegar" = assumir o lead: vira dono (assigned_to) e trava. Só se ainda estiver sem dono.
   const { data, error }=await SB.from('leads')
-    .update({ assigned_to:me.id, assigned_at:new Date().toISOString(), locked_by:me.id, locked_at:new Date().toISOString() })
+    .update({ assigned_to:me.id, assigned_at:new Date().toISOString(), locked_by:me.id, locked_at:new Date().toISOString(), updated_at:new Date().toISOString() })
     .eq('id',id).is('assigned_to',null).select();
   if(error){ alert('Erro ao pegar: '+error.message); }
   else if(!data || !data.length){ alert('Ops! Outro vendedor pegou esse lead primeiro.'); }
@@ -1606,7 +1616,7 @@ function updateStats(){
 async function mvst(id,status){
   const l=leads.find(x=>x.id===id);
   if(l && !lockState(l).canManage){ alert('Lead travado por '+lockState(l).name); return; }
-  const { error }=await SB.from('leads').update({ status }).eq('id',id);
+  const { error }=await SB.from('leads').update({ status, updated_at:new Date().toISOString() }).eq('id',id);
   if(error){ alert('Erro: '+error.message); return; }
   await loadLeads();
 }
@@ -1614,7 +1624,7 @@ async function mvst(id,status){
 async function classificar(id,status){
   const l=leads.find(x=>x.id===id);
   if(l && !lockState(l).canManage){ alert('Lead travado por '+lockState(l).name); return; }
-  const upd={ status };
+  const upd={ status, updated_at:new Date().toISOString() };
   if(l && !l.assigned_to){ upd.assigned_to=me.id; upd.assigned_at=new Date().toISOString(); }
   const { error }=await SB.from('leads').update(upd).eq('id',id);
   if(error){ alert('Erro: '+error.message); return; }
@@ -1729,6 +1739,10 @@ function rp(){
         <div class="kname">${esc(l.name)}${notesDot(l)}${lockChip(l)}</div>
         <div class="ksub">${esc(l.phone||l.address?.split(',')[1]?.trim()||'')}</div>
         <div class="kpills">${followChip(l)}${pills(l)}</div>
+        <div style="display:flex;justify-content:space-between;gap:6px;margin-top:6px;font-size:10px;color:var(--t3)">
+          <span title="Chegou em ${fmtDataHora(l.created_at)}"><i class="ti ti-download" style="font-size:11px"></i> ${tempoAtras(l.created_at)}</span>
+          ${l.updated_at&&Math.abs(new Date(l.updated_at)-new Date(l.created_at))>60000?`<span title="Última atualização: ${fmtDataHora(l.updated_at)}"><i class="ti ti-refresh" style="font-size:11px"></i> ${tempoAtras(l.updated_at)}</span>`:''}
+        </div>
         ${pool?`<button class="btn small btn-green" style="width:100%;margin-top:8px;padding:6px 0;font-size:12px" onclick="event.stopPropagation();pegar('${l.id}')"><i class="ti ti-hand-click"></i> Pegar</button>`:''}
       </div>`;
     }).join('');
@@ -1845,7 +1859,7 @@ async function saveLeadDetails(id){
   const mrrRaw=document.getElementById('lead-mrr')?.value;
   const deal_setup = setupRaw!=='' && setupRaw!=null ? Number(setupRaw) : null;
   const deal_mrr = mrrRaw!=='' && mrrRaw!=null ? Number(mrrRaw) : null;
-  const { error }=await SB.from('leads').update({ notes, follow_up_at, deal_setup, deal_mrr }).eq('id',id);
+  const { error }=await SB.from('leads').update({ notes, follow_up_at, deal_setup, deal_mrr, updated_at:new Date().toISOString() }).eq('id',id);
   if(error){ alert('Erro ao salvar: '+error.message); return; }
   // pede permissão de notificação do sistema ao agendar (só na 1ª vez)
   if(follow_up_at && 'Notification' in window && Notification.permission==='default'){
