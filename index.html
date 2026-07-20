@@ -1695,6 +1695,14 @@ function ensureClassCols(cols){
 }
 function getKanbanCols(){ let c=null; try{const s=ls('kcols');if(s)c=JSON.parse(s);}catch(_){} if(!Array.isArray(c)) c=DEFAULT_COLS.map(x=>({...x})); return ensureClassCols(c); }
 function saveKanbanCols(cols){ss('kcols',JSON.stringify(cols));}
+// Move a coluna pra esquerda (-1) ou direita (+1) e salva a nova ordem.
+function moveCol(id,dir){
+  const cols=getKanbanCols();
+  const i=cols.findIndex(c=>c.id===id), j=i+dir;
+  if(i<0||j<0||j>=cols.length) return;
+  const [c]=cols.splice(i,1); cols.splice(j,0,c);
+  saveKanbanCols(cols); rp();
+}
 function addKanbanCol(){
   const label=prompt('Nome da nova coluna:');
   if(!label||!label.trim())return;
@@ -1728,7 +1736,7 @@ function rp(){
   if(!board)return;
   const q=(document.getElementById('pipe-q')?.value||'').toLowerCase().trim();
   board.style.gridTemplateColumns=`repeat(${cols.length},minmax(160px,1fr))`;
-  board.innerHTML=cols.map(col=>{
+  board.innerHTML=cols.map((col,ci)=>{
     // Pipeline unificado: mostra leads de prospecção E do funil (redes sociais),
     // organizados pela coluna (status). Filtra pela busca por nome, se houver.
     const items=leads.filter(l=>noBoard(l) && l.status===col.id && visivelPipe(l,col.id) && (!q || (l.name||'').toLowerCase().includes(q)));
@@ -1749,9 +1757,11 @@ function rp(){
     return `<div class="kcol">
       <div class="khead">
         <span class="col-label" onclick="renameCol('${col.id}')" title="Clique para renomear" style="cursor:pointer;border-bottom:1px dashed var(--border);padding-bottom:1px">${esc(col.label)}</span>
-        <div style="display:flex;align-items:center;gap:6px">
+        <div style="display:flex;align-items:center;gap:4px">
+          <button onclick="event.stopPropagation();moveCol('${col.id}',-1)" ${ci===0?'disabled':''} title="Mover para a esquerda" style="background:none;border:none;color:var(--t3);font-size:14px;padding:0 2px;line-height:1;cursor:pointer;${ci===0?'opacity:.25;cursor:default':''}"><i class="ti ti-chevron-left"></i></button>
+          <button onclick="event.stopPropagation();moveCol('${col.id}',1)" ${ci===cols.length-1?'disabled':''} title="Mover para a direita" style="background:none;border:none;color:var(--t3);font-size:14px;padding:0 2px;line-height:1;cursor:pointer;${ci===cols.length-1?'opacity:.25;cursor:default':''}"><i class="ti ti-chevron-right"></i></button>
           <span class="kcnt">${items.length}</span>
-          <button onclick="removeCol('${col.id}')" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:13px;padding:0;line-height:1" title="Remover coluna"><i class="ti ti-x"></i></button>
+          <button onclick="event.stopPropagation();removeCol('${col.id}')" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:13px;padding:0;line-height:1" title="Remover coluna"><i class="ti ti-x"></i></button>
         </div>
       </div>
       <div class="kcards" id="cards-${col.id}" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="drop(event,'${col.id}')" style="min-height:80px;padding:4px;border-radius:8px;transition:background .15s">${cards}</div>
