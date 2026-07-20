@@ -1049,6 +1049,16 @@ function meetingAlert(){
 const BASE_SOURCES=['manual','ativo']; // base do closer (não é funil/inbound)
 function isProspeccao(l){ return !l.source || BASE_SOURCES.includes(l.source); }
 function isAtendimento(l){ return l.source && !BASE_SOURCES.includes(l.source); }
+// Pipeline unificado:
+// - "Novo" = pool dos leads do funil (tráfego), sem dono → todo vendedor vê e pode Pegar.
+// - Colunas seguintes = cada vendedor só vê os SEUS; o admin vê de todos.
+// - Leads do Google só entram no board depois que alguém os "joga pro pipeline" (ganham dono).
+function noBoard(l){ return isAtendimento(l) || (isProspeccao(l) && !!l.assigned_to); }
+function visivelPipe(l, colId){
+  if(me && me.role==='admin') return true;                 // admin vê todo mundo
+  if(!l.assigned_to) return colId==='novo' && isAtendimento(l); // pool: só na coluna Novo
+  return l.assigned_to===(me&&me.id);                      // com dono: só o dono vê
+}
 
 function toggleNewLead(){
   const f=document.getElementById('newlead-form');
@@ -1290,6 +1300,11 @@ async function pegar(id){
   if(error){ alert('Erro ao pegar: '+error.message); }
   else if(!data || !data.length){ alert('Ops! Outro vendedor pegou esse lead primeiro.'); }
   await loadLeads();
+}
+// Joga um lead do Google (prospecção) pro Pipeline: assume pra você e abre o board.
+async function paraPipeline(id){
+  await pegar(id);
+  nav('pipeline');
 }
 async function liberar(id){
   // Liberar = devolver pro pool (tira dono e trava)
@@ -1595,6 +1610,16 @@ async function mvst(id,status){
   if(error){ alert('Erro: '+error.message); return; }
   await loadLeads();
 }
+// Classificar do modal: muda o status E já assume o lead (vira seu) se ainda não tiver dono.
+async function classificar(id,status){
+  const l=leads.find(x=>x.id===id);
+  if(l && !lockState(l).canManage){ alert('Lead travado por '+lockState(l).name); return; }
+  const upd={ status };
+  if(l && !l.assigned_to){ upd.assigned_to=me.id; upd.assigned_at=new Date().toISOString(); }
+  const { error }=await SB.from('leads').update(upd).eq('id',id);
+  if(error){ alert('Erro: '+error.message); return; }
+  await loadLeads();
+}
 
 async function rmv(id){
   if(me.role!=='admin'){ alert('Só o admin pode excluir leads.'); return; }
@@ -1626,6 +1651,7 @@ function rl(){
     if(s.canManage){
       if(!s.by) actions+=`<button class="ibtn g" title="Pegar lead" onclick="pegar('${l.id}')"><i class="ti ti-hand-click"></i></button>`;
       else actions+=`<button class="ibtn" title="Liberar" onclick="liberar('${l.id}')"><i class="ti ti-lock-open"></i></button>`;
+      if(!l.assigned_to) actions+=`<button class="ibtn" title="Jogar pro Pipeline" onclick="paraPipeline('${l.id}')" style="color:var(--purple)"><i class="ti ti-arrow-big-right-lines"></i></button>`;
       actions+=`<button class="ibtn" title="Em contato" onclick="mvst('${l.id}','contato')"><i class="ti ti-arrow-right"></i></button>`;
       if(me.role==='admin') actions+=`<button class="ibtn r" title="Remover" onclick="rmv('${l.id}')"><i class="ti ti-trash"></i></button>`;
     }
@@ -1695,13 +1721,15 @@ function rp(){
   board.innerHTML=cols.map(col=>{
     // Pipeline unificado: mostra leads de prospecção E do funil (redes sociais),
     // organizados pela coluna (status). Filtra pela busca por nome, se houver.
-    const items=leads.filter(l=>l.status===col.id && (!q || (l.name||'').toLowerCase().includes(q)));
+    const items=leads.filter(l=>noBoard(l) && l.status===col.id && visivelPipe(l,col.id) && (!q || (l.name||'').toLowerCase().includes(q)));
     const cards=items.map(l=>{
       const s=lockState(l);
-      return `<div class="kcard ${s.other?'locked-other':''}" ${s.canManage?`draggable="true" ondragstart="dragStart(event,'${l.id}')" ondragend="dragEnd(event)"`:''} onclick="om('${l.id}')">
+      const pool=!l.assigned_to;
+      return `<div class="kcard ${s.other?'locked-other':''}" ${(!pool&&s.canManage)?`draggable="true" ondragstart="dragStart(event,'${l.id}')" ondragend="dragEnd(event)"`:''} onclick="om('${l.id}')">
         <div class="kname">${esc(l.name)}${notesDot(l)}${lockChip(l)}</div>
         <div class="ksub">${esc(l.phone||l.address?.split(',')[1]?.trim()||'')}</div>
         <div class="kpills">${followChip(l)}${pills(l)}</div>
+        ${pool?`<button class="btn small btn-green" style="width:100%;margin-top:8px;padding:6px 0;font-size:12px" onclick="event.stopPropagation();pegar('${l.id}')"><i class="ti ti-hand-click"></i> Pegar</button>`:''}
       </div>`;
     }).join('');
     return `<div class="kcol">
@@ -1792,9 +1820,9 @@ function om(id,fr=false){
       ${!inCrm?`<button class="btn btn-green" onclick="addOne('${l.id}');nav('leads');cm()"><i class="ti ti-plus"></i> Add CRM</button>`:''}
       ${inCrm&&s.canManage&&!s.by?`<button class="btn btn-green" onclick="pegar('${l.id}');cm()"><i class="ti ti-hand-click"></i> Pegar lead</button>`:''}
       ${inCrm&&s.by?`<button class="btn" onclick="liberar('${l.id}');cm()"><i class="ti ti-lock-open"></i> Liberar</button>`:''}
-      ${inCrm&&s.canManage?`<button class="btn" onclick="mvst('${l.id}','qualificado');cm()" style="border-color:#86efac;color:#15803d;background:#f0fdf4">✅ Qualificado</button>`:''}
-      ${inCrm&&s.canManage?`<button class="btn" onclick="mvst('${l.id}','agendado');cm()" style="border-color:#d8b4fe;color:#7c3aed;background:#faf5ff">📅 Agendado</button>`:''}
-      ${inCrm&&s.canManage?`<button class="btn" onclick="mvst('${l.id}','perdido');cm()" style="border-color:#fca5a5;color:#b91c1c;background:#fef2f2">❌ Perdido</button>`:''}
+      ${inCrm&&s.canManage?`<button class="btn" onclick="classificar('${l.id}','qualificado');cm()" style="border-color:#86efac;color:#15803d;background:#f0fdf4">✅ Qualificado</button>`:''}
+      ${inCrm&&s.canManage?`<button class="btn" onclick="classificar('${l.id}','agendado');cm()" style="border-color:#d8b4fe;color:#7c3aed;background:#faf5ff">📅 Agendado</button>`:''}
+      ${inCrm&&s.canManage?`<button class="btn" onclick="classificar('${l.id}','perdido');cm()" style="border-color:#fca5a5;color:#b91c1c;background:#fef2f2">❌ Perdido</button>`:''}
       ${l.whatsapp?`<button class="btn btn-green" onclick="owpp('${l.whatsapp}')"><i class="ti ti-brand-whatsapp"></i> WhatsApp</button>`:''}
       ${l.email?`<button class="btn" onclick="window.open('mailto:${esc(l.email)}')"><i class="ti ti-mail"></i> E-mail</button>`:''}
     </div>
