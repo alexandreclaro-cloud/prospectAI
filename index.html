@@ -509,12 +509,16 @@ th:nth-child(1),td:nth-child(1){width:22%}th:nth-child(2),td:nth-child(2){width:
     <!-- PIPELINE -->
     <div class="view" id="v-pipeline">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-        <span style="font-size:12px;color:var(--t3)">Clique no nome da coluna para renomear · Arraste os cards entre colunas</span>
+        <div style="position:relative;flex:1;min-width:200px;max-width:340px">
+          <i class="ti ti-search" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--t3);font-size:15px"></i>
+          <input id="pipe-q" oninput="rp()" placeholder="Buscar por nome..." style="width:100%;padding:8px 12px 8px 34px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;outline:none">
+        </div>
         <div style="display:flex;gap:8px">
           <button class="btn" onclick="addKanbanCol()"><i class="ti ti-plus"></i> Nova coluna</button>
           <button class="btn" onclick="resetKanbanCols()" style="color:var(--red)"><i class="ti ti-refresh"></i> Restaurar padrão</button>
         </div>
       </div>
+      <span style="font-size:11px;color:var(--t3);display:block;margin:-6px 0 12px">Clique no nome da coluna para renomear · Arraste os cards entre colunas</span>
       <div class="kanban" id="kanban-board"></div>
       <div class="empty" id="pe" style="display:none"><i class="ti ti-layout-kanban"></i><p>Nenhum lead no pipeline.</p></div>
     </div>
@@ -1640,10 +1644,20 @@ function rl(){
 
 // ─── Kanban dinâmico (colunas ainda por navegador) ─────────────────────────────
 const DEFAULT_COLS=[
-  {id:'novo',label:'Novo'},{id:'enriquecendo',label:'Enriquecendo'},{id:'pronto',label:'Pronto'},
+  {id:'novo',label:'Novo'},{id:'qualificado',label:'Qualificado'},{id:'agendado',label:'Agendado'},
+  {id:'enriquecendo',label:'Enriquecendo'},{id:'pronto',label:'Pronto'},
   {id:'contato',label:'Em contato'},{id:'perdido',label:'Perdido'}
 ];
-function getKanbanCols(){ try{const s=ls('kcols');if(s)return JSON.parse(s);}catch(_){} return DEFAULT_COLS; }
+// Garante que as colunas de classificação do funil existam (mesmo em board já customizado).
+function ensureClassCols(cols){
+  const posNovo = cols.findIndex(c=>c.id==='novo');
+  [['agendado','Agendado'],['qualificado','Qualificado']].forEach(([id,label])=>{
+    if(!cols.some(c=>c.id===id)) cols.splice(posNovo>=0?posNovo+1:cols.length,0,{id,label});
+  });
+  if(!cols.some(c=>c.id==='perdido')) cols.push({id:'perdido',label:'Perdido'});
+  return cols;
+}
+function getKanbanCols(){ let c=null; try{const s=ls('kcols');if(s)c=JSON.parse(s);}catch(_){} if(!Array.isArray(c)) c=DEFAULT_COLS.map(x=>({...x})); return ensureClassCols(c); }
 function saveKanbanCols(cols){ss('kcols',JSON.stringify(cols));}
 function addKanbanCol(){
   const label=prompt('Nome da nova coluna:');
@@ -1676,9 +1690,12 @@ function rp(){
   const cols=getKanbanCols();
   const board=document.getElementById('kanban-board');
   if(!board)return;
+  const q=(document.getElementById('pipe-q')?.value||'').toLowerCase().trim();
   board.style.gridTemplateColumns=`repeat(${cols.length},minmax(160px,1fr))`;
   board.innerHTML=cols.map(col=>{
-    const items=leads.filter(l=>isProspeccao(l)&&l.status===col.id);
+    // Pipeline unificado: mostra leads de prospecção E do funil (redes sociais),
+    // organizados pela coluna (status). Filtra pela busca por nome, se houver.
+    const items=leads.filter(l=>l.status===col.id && (!q || (l.name||'').toLowerCase().includes(q)));
     const cards=items.map(l=>{
       const s=lockState(l);
       return `<div class="kcard ${s.other?'locked-other':''}" ${s.canManage?`draggable="true" ondragstart="dragStart(event,'${l.id}')" ondragend="dragEnd(event)"`:''} onclick="om('${l.id}')">
@@ -1775,7 +1792,9 @@ function om(id,fr=false){
       ${!inCrm?`<button class="btn btn-green" onclick="addOne('${l.id}');nav('leads');cm()"><i class="ti ti-plus"></i> Add CRM</button>`:''}
       ${inCrm&&s.canManage&&!s.by?`<button class="btn btn-green" onclick="pegar('${l.id}');cm()"><i class="ti ti-hand-click"></i> Pegar lead</button>`:''}
       ${inCrm&&s.by?`<button class="btn" onclick="liberar('${l.id}');cm()"><i class="ti ti-lock-open"></i> Liberar</button>`:''}
-      ${inCrm&&s.canManage?`<button class="btn" onclick="mvst('${l.id}','contato');cm()"><i class="ti ti-arrow-right"></i> Em contato</button>`:''}
+      ${inCrm&&s.canManage?`<button class="btn" onclick="mvst('${l.id}','qualificado');cm()" style="border-color:#86efac;color:#15803d;background:#f0fdf4">✅ Qualificado</button>`:''}
+      ${inCrm&&s.canManage?`<button class="btn" onclick="mvst('${l.id}','agendado');cm()" style="border-color:#d8b4fe;color:#7c3aed;background:#faf5ff">📅 Agendado</button>`:''}
+      ${inCrm&&s.canManage?`<button class="btn" onclick="mvst('${l.id}','perdido');cm()" style="border-color:#fca5a5;color:#b91c1c;background:#fef2f2">❌ Perdido</button>`:''}
       ${l.whatsapp?`<button class="btn btn-green" onclick="owpp('${l.whatsapp}')"><i class="ti ti-brand-whatsapp"></i> WhatsApp</button>`:''}
       ${l.email?`<button class="btn" onclick="window.open('mailto:${esc(l.email)}')"><i class="ti ti-mail"></i> E-mail</button>`:''}
     </div>
@@ -2288,7 +2307,7 @@ function showMsg(txt,t){const m=document.getElementById('cfgmsg');m.className='c
 // ─── Helpers UI ───────────────────────────────────────────────────────────────
 function esc(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function pills(l){const p=[];if(l.whatsapp)p.push(`<a href="https://wa.me/55${l.whatsapp.replace(/\D/g,'')}" target="_blank" class="pill pwpp" style="text-decoration:none"><i class="ti ti-brand-whatsapp"></i> WPP</a>`);if(l.email)p.push(`<a href="mailto:${esc(l.email)}" class="pill pmail" style="text-decoration:none"><i class="ti ti-mail"></i> Email</a>`);if(l.instagram)p.push(`<a href="https://instagram.com/${l.instagram.replace('@','')}" target="_blank" class="pill pig" style="text-decoration:none"><i class="ti ti-brand-instagram"></i> IG</a>`);if(l.linkedin)p.push(`<a href="https://${esc(l.linkedin)}" target="_blank" class="pill pli" style="text-decoration:none"><i class="ti ti-brand-linkedin"></i> LI</a>`);return p.length?'<div class="pills">'+p.join('')+'</div>':'<span style="color:var(--t3);font-size:11px">—</span>';}
-function badge(s){ const m={novo:'bnovo',enriquecendo:'benriq',pronto:'bpronto',contato:'bcontato',perdido:'bperd'}; const cls=m[s]||'bnovo'; return`<span class="badge ${cls}">${esc(getStatusLabel(s))}</span>`; }
+function badge(s){ const m={novo:'bnovo',enriquecendo:'benriq',pronto:'bpronto',contato:'bcontato',perdido:'bperd',qualificado:'bpronto',agendado:'bcontato'}; const cls=m[s]||'bnovo'; return`<span class="badge ${cls}">${esc(getStatusLabel(s))}</span>`; }
 function sb(s){const col=s>=60?'var(--green)':s>=25?'var(--amber)':'var(--t3)';return`<div class="sbwrap"><div class="sbbar"><div class="sbfill" style="width:${s}%;background:${col}"></div></div><span class="snum">${s}</span></div>`;}
 function owpp(p){window.open('https://wa.me/55'+p.replace(/\D/g,''),'_blank');}
 
