@@ -1173,14 +1173,21 @@ function tempoAtras(iso){
   const d=Math.floor(h/24); return 'há '+d+(d===1?' dia':' dias');
 }
 function fmtDataHora(iso){ if(!iso) return ''; const d=new Date(iso); const p=n=>String(n).padStart(2,'0'); return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear()+' '+p(d.getHours())+':'+p(d.getMinutes()); }
+// Duração amigável a partir de minutos: "45min", "3h", "5 dias" (mais fácil de ler que minutos puros).
+function fmtDur(m){
+  m=Math.max(0,Math.round(m));
+  if(m<60) return m+'min';
+  const h=Math.floor(m/60); if(h<24) return h+(h===1?'h':'h');
+  const d=Math.floor(h/24); return d+(d===1?' dia':' dias');
+}
 function slaBadge(l){
   const start=l.assigned_at||l.created_at;
   if(l.first_response_at){
     const m=Math.max(0,Math.round((new Date(l.first_response_at)-new Date(start))/60000));
-    return `<span class="lockchip mine"><i class="ti ti-check"></i> respondido ${m}min</span>`;
+    return `<span class="lockchip mine"><i class="ti ti-check"></i> respondido em ${fmtDur(m)}</span>`;
   }
   const m=minsSince(start), over=m>=SLA_MIN;
-  return `<span class="lockchip" style="background:${over?'var(--rbg)':'var(--ambg)'};color:${over?'var(--red)':'var(--amber)'}"><i class="ti ti-clock"></i> ${m}min ${over?'(estourou!)':''}</span>`;
+  return `<span class="lockchip" style="background:${over?'var(--rbg)':'var(--ambg)'};color:${over?'var(--red)':'var(--amber)'}"><i class="ti ti-clock"></i> ${fmtDur(m)} ${over?'(estourou!)':''}</span>`;
 }
 function money(v){ return v ? 'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:0}) : ''; }
 
