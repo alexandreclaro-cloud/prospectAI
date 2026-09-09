@@ -669,12 +669,16 @@ async function init(){
   if(jm){ pendingJoinCode = jm[1].toUpperCase(); ss('pendingjoin', pendingJoinCode); }
   else if(ls('pendingjoin')){ pendingJoinCode = ls('pendingjoin'); }
 
+  const isRecovery = /type=recovery/.test(location.hash+' '+location.search);
   const { data:{ session } } = await SB.auth.getSession();
-  if(session){ await afterLogin(session.user); }
+  if(isRecovery){ recoveryMode=true; showResetPassword(); }
+  else if(session){ await afterLogin(session.user); }
   else if(pendingJoinCode){ showSignup(); }
   else showLogin();
 
   SB.auth.onAuthStateChange((_ev, s)=>{
+    if(_ev==='PASSWORD_RECOVERY'){ recoveryMode=true; showResetPassword(); return; }
+    if(recoveryMode) return;              // não deixa auto-login enquanto redefine a senha
     if(s && !me) afterLogin(s.user);
     if(!s){ me=null; showLogin(); }
   });
@@ -700,7 +704,48 @@ function showLogin(){
     <div style="position:relative"><input id="g-pass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()" style="width:100%;padding-right:42px"/><button type="button" tabindex="-1" onclick="togglePass(this,'g-pass')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--t3);font-size:17px;padding:0;line-height:1"><i class="ti ti-eye"></i></button></div>
     <div class="gate-msg" id="gate-msg"></div>
     <button class="btn btn-primary" onclick="doLogin()">Entrar</button>
+    <div class="switch"><a onclick="showForgot()">Esqueci minha senha</a></div>
     <div class="switch">Não tem conta? <a onclick="showSignup()">Criar conta</a></div>`);
+}
+
+let recoveryMode=false;
+function showForgot(){
+  gate(`${gateLogo}
+    <h2>Esqueci minha senha</h2><p class="sub">Digite seu e-mail e enviamos um link para criar uma nova senha</p>
+    <label>E-mail</label><input id="g-email" type="email" autocomplete="email" onkeydown="if(event.key==='Enter')doForgot()"/>
+    <div class="gate-msg" id="gate-msg"></div>
+    <button class="btn btn-primary" onclick="doForgot()">Enviar link de redefinição</button>
+    <div class="switch"><a onclick="showLogin()">Voltar para o login</a></div>`);
+}
+async function doForgot(){
+  const email=document.getElementById('g-email').value.trim();
+  if(!email){ gateMsg('Digite seu e-mail.','err'); return; }
+  gateMsg('Enviando...','info');
+  const { error }=await SB.auth.resetPasswordForEmail(email, { redirectTo: location.origin+location.pathname });
+  if(error){ gateMsg(traduz(error.message),'err'); return; }
+  gateMsg('Pronto! Se existe conta com esse e-mail, enviamos um link para redefinir a senha. Veja a caixa de entrada (e o spam).','ok');
+}
+function showResetPassword(){
+  gate(`${gateLogo}
+    <h2>Criar nova senha</h2><p class="sub">Defina a nova senha da sua conta</p>
+    <label>Nova senha</label>${passField('g-pass','minlength="6" autocomplete="new-password"')}
+    <label>Repita a nova senha</label>${passField('g-pass2','minlength="6" autocomplete="new-password" onkeydown="if(event.key===\'Enter\')doResetPassword()"')}
+    <div class="gate-msg" id="gate-msg"></div>
+    <button class="btn btn-primary" onclick="doResetPassword()">Salvar nova senha</button>`);
+}
+async function doResetPassword(){
+  const p1=document.getElementById('g-pass').value;
+  const p2=document.getElementById('g-pass2').value;
+  if(p1.length<6){ gateMsg('A senha precisa de no mínimo 6 caracteres.','err'); return; }
+  if(p1!==p2){ gateMsg('As senhas não conferem.','err'); return; }
+  gateMsg('Salvando...','info');
+  const { error }=await SB.auth.updateUser({ password:p1 });
+  if(error){ gateMsg(traduz(error.message),'err'); return; }
+  recoveryMode=false;
+  gateMsg('Senha alterada! Entrando...','ok');
+  try{ history.replaceState({},'',location.pathname); }catch(_){}
+  const { data:{ user } }=await SB.auth.getUser();
+  if(user) afterLogin(user); else showLogin();
 }
 
 function showSignup(){
